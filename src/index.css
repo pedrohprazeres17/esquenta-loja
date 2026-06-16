@@ -1,0 +1,207 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Big+Shoulders+Stencil+Display:wght@900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+
+@import "tailwindcss";
+
+/* ── Brand tokens ─────────────────────────────────────────── */
+:root {
+  --preto:    #0E0D0B;
+  --vermelho: #FF2A1F;
+  --papel:    #E8E1D2;
+  --vinho:    #6F1009;
+  --amarelo:  #FFE800;
+
+  --font-display: 'Anton', sans-serif;
+  --font-stencil: 'Big Shoulders Stencil Display', sans-serif;
+  --font-mono:    'Space Mono', monospace;
+}
+
+/* ── Tailwind theme extension ─────────────────────────────── */
+@theme {
+  --color-preto:    #0E0D0B;
+  --color-vermelho: #FF2A1F;
+  --color-papel:    #E8E1D2;
+  --color-vinho:    #6F1009;
+  --color-amarelo:  #FFE800;
+
+  --font-family-display: 'Anton', sans-serif;
+  --font-family-stencil: 'Big Shoulders Stencil Display', sans-serif;
+  --font-family-mono:    'Space Mono', monospace;
+
+  --radius: 0px;
+}
+
+/* ── Base ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: var(--preto);
+  color: var(--papel);
+  font-family: var(--font-mono);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Neobrutalist button base ─────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 2px solid var(--preto);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--preto);
+  cursor: pointer;
+  transition: box-shadow 80ms ease, transform 80ms ease;
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 0.75rem 1.5rem;
+}
+.btn:hover {
+  box-shadow: none;
+  transform: translate(4px, 4px);
+}
+.btn:active {
+  box-shadow: none;
+  transform: translate(4px, 4px);
+}
+
+.btn-primary {
+  background-color: var(--vermelho);
+  color: var(--papel);
+  border-color: var(--preto);
+}
+.btn-primary:hover {
+  background-color: var(--papel);
+  color: var(--preto);
+}
+
+.btn-secondary {
+  background-color: var(--papel);
+  color: var(--preto);
+  border-color: var(--preto);
+}
+.btn-secondary:hover {
+  background-color: var(--vermelho);
+  color: var(--papel);
+}
+
+.btn-outline {
+  background-color: transparent;
+  color: var(--papel);
+  border-color: var(--papel);
+  box-shadow: 4px 4px 0 var(--papel);
+}
+.btn-outline:hover {
+  background-color: var(--papel);
+  color: var(--preto);
+}
+
+.btn-sm {
+  font-size: 0.75rem;
+  padding: 0.5rem 1rem;
+}
+
+.btn-lg {
+  font-size: 1.25rem;
+  padding: 1rem 2rem;
+}
+
+/* ── Card hover neobrutalist ──────────────────────────────── */
+.card-hover {
+  transition: transform 80ms ease, box-shadow 80ms ease;
+}
+.card-hover:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--vermelho);
+}
+
+/* ── Ticker animation ─────────────────────────────────────── */
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.ticker-track {
+  display: flex;
+  animation: ticker 22s linear infinite;
+  width: max-content;
+}
+
+/* ── Grain texture overlay ────────────────────────────────── */
+.grain::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Diagonal stripe (fita de obra) ──────────────────────── */
+.fita-obra {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--preto) 0px,
+    var(--preto) 20px,
+    var(--vermelho) 20px,
+    var(--vermelho) 40px
+  );
+}
+
+.fita-amarela {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--preto) 0px,
+    var(--preto) 20px,
+    var(--amarelo) 20px,
+    var(--amarelo) 40px
+  );
+}
+
+/* ── Section heading ──────────────────────────────────────── */
+.section-title {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: -0.025em;
+  line-height: 0.95;
+}
+
+/* ── Form inputs ──────────────────────────────────────────── */
+input, textarea, select {
+  font-family: var(--font-mono);
+  border-radius: 0 !important;
+  outline: none;
+  background: transparent;
+  border: 2px solid var(--papel);
+  color: var(--papel);
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--vermelho);
+  box-shadow: 2px 2px 0 var(--vermelho);
+}
+
+input::placeholder, textarea::placeholder {
+  color: color-mix(in srgb, var(--papel) 40%, transparent);
+  font-family: var(--font-mono);
+}
+
+/* ── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--preto); }
+::-webkit-scrollbar-thumb { background: var(--vermelho); }
+::-webkit-scrollbar-thumb:hover { background: var(--vinho); }
