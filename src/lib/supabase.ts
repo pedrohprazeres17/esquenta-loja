@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Product, Supplier, Order, Profile } from '@/types'
+import type { Product, ProductSupply, Supplier, Order, Profile } from '@/types'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -121,6 +121,22 @@ export const suppliersApi = {
     const { data, error } = await supabase.from('suppliers').insert(supplier).select().single()
     if (error) throw error
     return data as Supplier
+  },
+}
+
+/* ── Product supply (custo/fornecedor — só admin via RLS) ── */
+export const productSupplyApi = {
+  async getAll() {
+    const { data, error } = await supabase.from('product_supply').select('*')
+    if (error) throw error
+    return data as ProductSupply[]
+  },
+
+  async upsert(productId: string, supply: Omit<ProductSupply, 'product_id'>) {
+    const { error } = await supabase
+      .from('product_supply')
+      .upsert({ product_id: productId, ...supply })
+    if (error) throw error
   },
 }
 

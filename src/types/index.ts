@@ -32,6 +32,17 @@ export interface Product {
   length_cm?: number
 }
 
+/* ── Product supply (custo/fornecedor — só admin) ─────────── */
+// Vive em tabela separada (product_supply) com RLS só-admin, pra NÃO vazar
+// custo/SKU na leitura pública de products. No app só o /admin lê isso.
+export interface ProductSupply {
+  product_id: string
+  supplier_id?: string | null
+  supplier_sku?: string | null
+  supplier_price_cents?: number | null
+  supplier_url?: string | null
+}
+
 /* ── Supplier ────────────────────────────────────────────── */
 export type SupplierType = 'aliexpress' | 'shopify' | 'manual' | 'api'
 

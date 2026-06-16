@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Trash2, Edit, Plus, Upload, X, Link as LinkIcon } from 'lucide-react'
 import { getAllProducts } from '@/data/products'
-import { isSupabaseConfigured, productsApi } from '@/lib/supabase'
-import type { Product } from '@/types'
+import { authApi, isSupabaseConfigured, productsApi, productSupplyApi, supabase } from '@/lib/supabase'
+import type { Product, ProductSupply } from '@/types'
 import { formatPrice, slugify } from '@/lib/utils'
 import { FitaObra, Logo } from '@/components/brand'
 
@@ -50,6 +51,8 @@ function FieldError({ message }: { message?: string }) {
 }
 
 export function Admin() {
+  const navigate = useNavigate()
+  const [authChecking, setAuthChecking] = useState(true)
   const [products, setProducts] = useState<Product[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -57,8 +60,38 @@ export function Admin() {
   const [imageUrlInput, setImageUrlInput] = useState('')
 
   useEffect(() => {
-    getAllProducts().then(setProducts)
-  }, [])
+    let active = true
+    async function init() {
+      // Gate de acesso: só admin entra (no modo mock/dev não há auth, libera).
+      if (isSupabaseConfigured) {
+        const session = await authApi.getSession()
+        if (!session) { navigate('/conta'); return }
+        const { data: prof } = await supabase
+          .from('profiles').select('role').eq('user_id', session.user.id).single()
+        if (prof?.role !== 'admin') { navigate('/'); return }
+      }
+      // Produtos (públicos) + custo/fornecedor (só admin) → mescla pra exibir.
+      const prods = await getAllProducts()
+      let supplyMap: Record<string, ProductSupply> = {}
+      if (isSupabaseConfigured) {
+        try {
+          const supply = await productSupplyApi.getAll()
+          supplyMap = Object.fromEntries(supply.map(s => [s.product_id, s]))
+        } catch { /* sem permissão de custo: segue sem ele */ }
+      }
+      if (!active) return
+      setProducts(prods.map(p => ({
+        ...p,
+        supplier_id: supplyMap[p.id]?.supplier_id ?? p.supplier_id,
+        supplier_sku: supplyMap[p.id]?.supplier_sku ?? p.supplier_sku,
+        supplier_price_cents: supplyMap[p.id]?.supplier_price_cents ?? p.supplier_price_cents,
+        supplier_url: supplyMap[p.id]?.supplier_url ?? p.supplier_url,
+      })))
+      setAuthChecking(false)
+    }
+    init()
+    return () => { active = false }
+  }, [navigate])
 
   const {
     register,
@@ -120,12 +153,12 @@ export function Admin() {
   const parseBRL = (v: string) => Math.round(parseFloat(v.replace(',', '.')) * 100) || 0
 
   async function onSubmit(data: ProductForm): Promise<void> {
-    const payload = {
+    // Produto (público) e custo/fornecedor (só admin) são gravados separados.
+    const productPayload = {
       name: data.name,
       slug: data.slug,
       category: data.category,
       price_cents: parseBRL(data.price_brl),
-      supplier_price_cents: data.supplier_price_brl ? parseBRL(data.supplier_price_brl) : undefined,
       description: data.description,
       stock: data.stock,
       is_featured: data.is_featured,
@@ -133,8 +166,11 @@ export function Admin() {
       edition_number: data.is_limited ? data.edition_number : undefined,
       max_edition: data.is_limited ? data.max_edition : undefined,
       image_urls: imageUrls.length ? imageUrls : ['https://placehold.co/600x800/0E0D0B/FF2A1F?text=' + encodeURIComponent(data.name)],
+    }
+    const supply = {
       supplier_id: data.supplier_id || undefined,
       supplier_sku: data.supplier_sku || undefined,
+      supplier_price_cents: data.supplier_price_brl ? parseBRL(data.supplier_price_brl) : undefined,
       supplier_url: data.supplier_url || undefined,
     }
 
@@ -142,11 +178,13 @@ export function Admin() {
       // Persiste de verdade no banco (requer login como admin — ver RLS)
       try {
         if (editingId) {
-          const updated = await productsApi.update(editingId, payload)
-          setProducts(ps => ps.map(p => (p.id === editingId ? updated : p)))
+          const updated = await productsApi.update(editingId, productPayload)
+          await productSupplyApi.upsert(editingId, supply)
+          setProducts(ps => ps.map(p => (p.id === editingId ? { ...updated, ...supply } : p)))
         } else {
-          const created = await productsApi.create(payload as Omit<Product, 'id' | 'created_at'>)
-          setProducts(ps => [created, ...ps])
+          const created = await productsApi.create(productPayload as Omit<Product, 'id' | 'created_at'>)
+          await productSupplyApi.upsert(created.id, supply)
+          setProducts(ps => [{ ...created, ...supply }, ...ps])
         }
       } catch (e) {
         alert('Erro ao salvar no Supabase: ' + (e as Error).message)
@@ -155,12 +193,13 @@ export function Admin() {
     } else {
       // Modo mock — só estado local (some ao recarregar; conecte o Supabase pra persistir)
       if (editingId) {
-        setProducts(ps => ps.map(p => (p.id === editingId ? { ...p, ...payload } : p)))
+        setProducts(ps => ps.map(p => (p.id === editingId ? { ...p, ...productPayload, ...supply } : p)))
       } else {
         const newProduct: Product = {
           id: String(Date.now()),
           created_at: new Date().toISOString(),
-          ...payload,
+          ...productPayload,
+          ...supply,
         } as Product
         setProducts(ps => [newProduct, ...ps])
       }
@@ -187,6 +226,14 @@ export function Admin() {
       setImageUrls(prev => [...prev, url])
     })
   }, [])
+
+  if (authChecking) {
+    return (
+      <div style={{ backgroundColor: 'var(--preto)', minHeight: '100vh' }} className="flex items-center justify-center">
+        <p className="font-mono" style={{ color: 'color-mix(in srgb, var(--papel) 60%, transparent)' }}>Verificando acesso…</p>
+      </div>
+    )
+  }
 
   return (
     <div style={{ backgroundColor: 'var(--preto)', minHeight: '100vh' }}>
