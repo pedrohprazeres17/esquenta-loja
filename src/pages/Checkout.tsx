@@ -6,6 +6,8 @@ import { z } from 'zod'
 import { useCart } from '@/contexts/CartContext'
 import { calculateShipping, type ShippingOption } from '@/lib/shipping'
 import { cn, formatPrice, formatCEP, formatPhone, formatCPF } from '@/lib/utils'
+import { ordersDb } from '@/lib/db'
+import { orderNumber } from '@/lib/orders'
 import { Field } from '@/components/form/Field'
 
 const checkoutSchema = z.object({
@@ -39,7 +41,7 @@ type Step = 'address' | 'payment'
 export function Checkout() {
   const { items, total, clearCart } = useCart()
   const [step, setStep] = useState<Step>('address')
-  const [done, setDone] = useState<{ total: number } | null>(null)
+  const [done, setDone] = useState<{ number: string; total: number } | null>(null)
 
   const {
     register,
@@ -72,10 +74,9 @@ export function Checkout() {
     setShippingMsg(null)
     setSelectedShipping(null)
     try {
-      const { options, fallback } = await calculateShipping(cep ?? '', items)
+      const options = await calculateShipping(cep ?? '', items)
       setShippingOptions(options)
       setSelectedShipping(options[0] ?? null)
-      if (fallback) setShippingMsg('Cálculo em tempo real indisponível. Aplicamos a taxa padrão.')
     } catch (e) {
       setShippingOptions([])
       setShippingMsg((e as Error).message)
@@ -95,15 +96,32 @@ export function Checkout() {
     window.scrollTo({ top: 0 })
   }
 
-  async function onSubmit() {
-    // TODO: integrar Mercado Pago (gravar pedido com frete/transportadora escolhidos)
-    await new Promise(r => setTimeout(r, 800))
-    setDone({ total: totalFinal })
+  async function onSubmit(data: CheckoutForm) {
+    // Pedido fica registrado como aguardando pagamento.
+    // TODO: integrar Mercado Pago (preferência + webhook atualizam o status).
+    const { email, payment_method, ...address } = data
+    const order = await ordersDb.create({
+      email,
+      items: items.map(({ product, quantity }) => ({
+        product_id: product.id,
+        product_name: product.name,
+        quantity,
+        price_cents: product.price_cents,
+      })),
+      address: { ...address, state: address.state.toUpperCase() },
+      subtotal_cents: total,
+      shipping: selectedShipping ? { ...selectedShipping, price_cents: freteCents } : undefined,
+      discount_cents: discount,
+      total_cents: totalFinal,
+      payment_method,
+      status: 'pending',
+    })
+    setDone({ number: orderNumber(order), total: order.total_cents })
     clearCart()
     window.scrollTo({ top: 0 })
   }
 
-  if (done) return <Confirmacao total={done.total} />
+  if (done) return <Confirmacao number={done.number} total={done.total} />
   if (items.length === 0) return <Navigate to="/carrinho" replace />
 
   return (
@@ -269,7 +287,7 @@ export function Checkout() {
                 <div className="border-l-2 border-cobalto bg-branco p-5">
                   <p className="t-label text-marinho">Integração em andamento</p>
                   <p className="mt-2 text-sm leading-relaxed text-preto/80">
-                    O pagamento pelo Mercado Pago entra na próxima etapa do projeto. Este checkout não faz cobrança.
+                    O pedido fica registrado, sem cobrança. O pagamento pelo Mercado Pago entra na próxima etapa do projeto.
                   </p>
                 </div>
 
@@ -387,15 +405,17 @@ function Choice({
   )
 }
 
-function Confirmacao({ total }: { total: number }) {
+function Confirmacao({ number, total }: { number: string; total: number }) {
   return (
     <div className="mx-auto max-w-2xl px-4 py-24 text-center">
       <p className="t-label text-cobalto">Checkout / Concluído</p>
-      <h1 className="t-display mt-4 text-[clamp(2.4rem,6vw,4rem)] text-marinho">Pedido simulado.</h1>
+      <h1 className="t-display mt-4 text-[clamp(2.4rem,6vw,4rem)] text-marinho">Pedido registrado.</h1>
+      <p className="t-num mt-6 text-marinho">
+        Pedido {number} · {formatPrice(total)}
+      </p>
       <p className="mx-auto mt-6 max-w-md text-lg leading-relaxed text-preto/80">
         Nenhuma cobrança foi feita. O pagamento pelo Mercado Pago entra na próxima etapa do projeto.
       </p>
-      <p className="t-num mt-6 text-marinho">Total: {formatPrice(total)}</p>
       <Link to="/loja" className="btn btn-primary mt-10">Voltar pra loja</Link>
     </div>
   )

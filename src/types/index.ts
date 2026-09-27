@@ -95,10 +95,22 @@ export interface OrderItem {
   supplier_sku?: string
 }
 
+export interface OrderShipping {
+  name: string
+  company: string
+  price_cents: number
+  delivery_days: number | null
+}
+
 export interface Order {
   id: string
+  number?: number
   user_id?: string
+  email?: string
   items: OrderItem[]
+  subtotal_cents?: number
+  shipping?: OrderShipping
+  discount_cents?: number
   total_cents: number
   status: OrderStatus
   address: OrderAddress

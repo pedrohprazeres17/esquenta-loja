@@ -1,14 +1,15 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Trash2, Edit, Plus, Upload, X, Link as LinkIcon } from 'lucide-react'
-import { getAllProducts } from '@/data/products'
-import { authApi, isSupabaseConfigured, productsApi, productSupplyApi, supabase } from '@/lib/supabase'
-import type { Product, ProductSupply } from '@/types'
+import { productsDb, ordersDb } from '@/lib/db'
+import type { Order, Product } from '@/types'
 import { cn, formatPrice, slugify } from '@/lib/utils'
 import { CATEGORIES, categoryLabel } from '@/lib/categories'
+import { ORDER_STATUS_LABEL, itemCount, orderNumber } from '@/lib/orders'
+import { imageToDataUrl } from '@/lib/image'
 import { Logo } from '@/components/brand'
 import { Field } from '@/components/form/Field'
 
@@ -31,48 +32,25 @@ const productSchema = z.object({
 
 type ProductForm = z.infer<typeof productSchema>
 
+const PAYMENT_LABEL: Record<NonNullable<Order['payment_method']>, string> = {
+  pix: 'PIX',
+  credit_card: 'Crédito',
+  debit_card: 'Débito',
+}
+
 export function Admin() {
-  const navigate = useNavigate()
-  const [authChecking, setAuthChecking] = useState(true)
+  const [tab, setTab] = useState<'produtos' | 'pedidos'>('produtos')
   const [products, setProducts] = useState<Product[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [imageUrls, setImageUrls] = useState<string[]>([])
   const [imageUrlInput, setImageUrlInput] = useState('')
 
   useEffect(() => {
-    let active = true
-    async function init() {
-      // Gate de acesso: só admin entra (no modo mock/dev não há auth, libera).
-      if (isSupabaseConfigured) {
-        const session = await authApi.getSession()
-        if (!session) { navigate('/conta'); return }
-        const { data: prof } = await supabase
-          .from('profiles').select('role').eq('user_id', session.user.id).single()
-        if (prof?.role !== 'admin') { navigate('/'); return }
-      }
-      // Produtos (públicos) + custo/fornecedor (só admin) → mescla pra exibir.
-      const prods = await getAllProducts()
-      let supplyMap: Record<string, ProductSupply> = {}
-      if (isSupabaseConfigured) {
-        try {
-          const supply = await productSupplyApi.getAll()
-          supplyMap = Object.fromEntries(supply.map(s => [s.product_id, s]))
-        } catch { /* sem permissão de custo: segue sem ele */ }
-      }
-      if (!active) return
-      setProducts(prods.map(p => ({
-        ...p,
-        supplier_id: supplyMap[p.id]?.supplier_id ?? p.supplier_id,
-        supplier_sku: supplyMap[p.id]?.supplier_sku ?? p.supplier_sku,
-        supplier_price_cents: supplyMap[p.id]?.supplier_price_cents ?? p.supplier_price_cents,
-        supplier_url: supplyMap[p.id]?.supplier_url ?? p.supplier_url,
-      })))
-      setAuthChecking(false)
-    }
-    init()
-    return () => { active = false }
-  }, [navigate])
+    productsDb.getAll().then(setProducts)
+    ordersDb.getAll().then(setOrders)
+  }, [])
 
   const {
     register,
@@ -120,22 +98,20 @@ export function Admin() {
 
   async function deleteProduct(id: string) {
     if (!confirm('Deletar produto?')) return
-    if (isSupabaseConfigured) {
-      try {
-        await productsApi.delete(id)
-      } catch (e) {
-        alert('Erro ao deletar no Supabase: ' + (e as Error).message)
-        return
-      }
-    }
+    await productsDb.delete(id)
     setProducts(ps => ps.filter(p => p.id !== id))
+  }
+
+  async function resetCatalog() {
+    if (!confirm('Voltar o catálogo pro original? Produtos criados ou editados aqui somem. Pedidos ficam.')) return
+    await productsDb.reset()
+    setProducts(await productsDb.getAll())
   }
 
   const parseBRL = (v: string) => Math.round(parseFloat(v.replace(',', '.')) * 100) || 0
 
   async function onSubmit(data: ProductForm): Promise<void> {
-    // Produto (público) e custo/fornecedor (só admin) são gravados separados.
-    const productPayload = {
+    const payload = {
       name: data.name,
       slug: data.slug,
       category: data.category,
@@ -147,43 +123,24 @@ export function Admin() {
       edition_number: data.is_limited ? data.edition_number : undefined,
       max_edition: data.is_limited ? data.max_edition : undefined,
       image_urls: imageUrls.length ? imageUrls : ['https://placehold.co/800x800/0041D2/FEFEFE?text=' + encodeURIComponent(data.name)],
-    }
-    const supply = {
+      // Custo e fornecedor: só aparecem aqui no admin.
       supplier_id: data.supplier_id || undefined,
       supplier_sku: data.supplier_sku || undefined,
       supplier_price_cents: data.supplier_price_brl ? parseBRL(data.supplier_price_brl) : undefined,
       supplier_url: data.supplier_url || undefined,
     }
 
-    if (isSupabaseConfigured) {
-      // Persiste de verdade no banco (requer login como admin — ver RLS)
-      try {
-        if (editingId) {
-          const updated = await productsApi.update(editingId, productPayload)
-          await productSupplyApi.upsert(editingId, supply)
-          setProducts(ps => ps.map(p => (p.id === editingId ? { ...updated, ...supply } : p)))
-        } else {
-          const created = await productsApi.create(productPayload as Omit<Product, 'id' | 'created_at'>)
-          await productSupplyApi.upsert(created.id, supply)
-          setProducts(ps => [{ ...created, ...supply }, ...ps])
-        }
-      } catch (e) {
-        alert('Erro ao salvar no Supabase: ' + (e as Error).message)
-        return
-      }
-    } else {
-      // Modo mock — só estado local (some ao recarregar; conecte o Supabase pra persistir)
+    try {
       if (editingId) {
-        setProducts(ps => ps.map(p => (p.id === editingId ? { ...p, ...productPayload, ...supply } : p)))
+        const updated = await productsDb.update(editingId, payload)
+        setProducts(ps => ps.map(p => (p.id === editingId ? updated : p)))
       } else {
-        const newProduct: Product = {
-          id: String(Date.now()),
-          created_at: new Date().toISOString(),
-          ...productPayload,
-          ...supply,
-        } as Product
-        setProducts(ps => [newProduct, ...ps])
+        const created = await productsDb.create(payload)
+        setProducts(ps => [created, ...ps])
       }
+    } catch (e) {
+      alert((e as Error).message)
+      return
     }
 
     setShowForm(false)
@@ -199,22 +156,22 @@ export function Admin() {
     setImageUrlInput('')
   }
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
-    files.forEach(file => {
-      const url = URL.createObjectURL(file)
-      setImageUrls(prev => [...prev, url])
-    })
+  // Imagem enviada vira data URL reduzida: fica salva no banco local junto com o produto.
+  const addFiles = useCallback(async (files: File[]) => {
+    for (const file of files.filter(f => f.type.startsWith('image/'))) {
+      try {
+        const url = await imageToDataUrl(file)
+        setImageUrls(prev => [...prev, url])
+      } catch (e) {
+        alert((e as Error).message)
+      }
+    }
   }, [])
 
-  if (authChecking) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-papel">
-        <p className="t-label text-concreto">Verificando acesso</p>
-      </div>
-    )
-  }
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    addFiles(Array.from(e.dataTransfer.files))
+  }, [addFiles])
 
   return (
     <div className="min-h-screen bg-papel">
@@ -231,20 +188,39 @@ export function Admin() {
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
           <div>
-            <p className="t-label text-cobalto">{products.length} {products.length === 1 ? 'produto' : 'produtos'}</p>
-            <h1 className="t-display mt-3 text-5xl text-marinho">Produtos.</h1>
-            <span
-              className={cn(
-                't-label mt-4 inline-block px-2 py-1 text-[10px]',
-                isSupabaseConfigured ? 'bg-cobalto text-branco' : 'border border-marinho text-marinho',
-              )}
-            >
-              {isSupabaseConfigured ? 'Banco conectado · alterações salvam de verdade' : 'Modo mock · conecte o Supabase pra salvar'}
+            <p className="t-label text-cobalto">Painel</p>
+            <h1 className="t-display mt-3 text-5xl text-marinho">{tab === 'produtos' ? 'Produtos.' : 'Pedidos.'}</h1>
+            <span className="t-label mt-4 inline-block border border-marinho px-2 py-1 text-[10px] text-marinho">
+              Banco local · salvo neste navegador
             </span>
           </div>
-          <button onClick={openNew} className="btn btn-primary">
-            <Plus size={16} /> Novo produto
-          </button>
+          {tab === 'produtos' && (
+            <div className="flex flex-wrap gap-3">
+              <button onClick={resetCatalog} className="btn btn-outline">Restaurar catálogo</button>
+              <button onClick={openNew} className="btn btn-primary">
+                <Plus size={16} /> Novo produto
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="mb-6 flex gap-8 border-b border-linha">
+          {([
+            ['produtos', `Produtos (${products.length})`],
+            ['pedidos', `Pedidos (${orders.length})`],
+          ] as const).map(([t, label]) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              aria-pressed={tab === t}
+              className={cn(
+                't-label -mb-px border-b-2 pb-3 transition-colors',
+                tab === t ? 'border-cobalto text-marinho' : 'border-transparent text-concreto hover:text-marinho',
+              )}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* Formulário */}
@@ -353,14 +329,13 @@ export function Admin() {
                       multiple
                       className="sr-only"
                       onChange={e => {
-                        Array.from(e.target.files ?? []).forEach(f => {
-                          setImageUrls(prev => [...prev, URL.createObjectURL(f)])
-                        })
+                        addFiles(Array.from(e.target.files ?? []))
+                        e.target.value = ''
                       }}
                     />
                   </div>
 
-                  {/* Colar URL — pra usar a foto hospedada do fornecedor (persiste no banco) */}
+                  {/* Colar URL — pra usar a foto hospedada do fornecedor */}
                   <div className="mt-3 flex gap-2" onClick={e => e.stopPropagation()}>
                     <div className="flex flex-1 items-center gap-2 border border-preto/20 bg-branco pl-3">
                       <LinkIcon size={14} className="shrink-0 text-concreto" />
@@ -407,63 +382,111 @@ export function Admin() {
           </div>
         )}
 
-        {/* Tabela */}
-        <div className="overflow-x-auto bg-branco">
-          <div className="min-w-[760px]">
-            <div
-              className="t-label grid gap-4 border-b-2 border-marinho px-4 py-3 text-[10px] text-concreto"
-              style={{ gridTemplateColumns: '2.2fr 1fr 1fr 1fr 0.7fr auto' }}
-            >
-              <span>Produto</span>
-              <span>Categoria</span>
-              <span>Preço</span>
-              <span>Custo</span>
-              <span>Estoque</span>
-              <span className="w-[76px]">Ações</span>
-            </div>
-
-            {products.map(product => (
+        {/* Produtos */}
+        {tab === 'produtos' && (
+          <div className="overflow-x-auto bg-branco">
+            <div className="min-w-[760px]">
               <div
-                key={product.id}
-                className="grid items-center gap-4 border-b border-linha px-4 py-3 transition-colors hover:bg-papel/50"
+                className="t-label grid gap-4 border-b-2 border-marinho px-4 py-3 text-[10px] text-concreto"
                 style={{ gridTemplateColumns: '2.2fr 1fr 1fr 1fr 0.7fr auto' }}
               >
-                <div className="flex items-center gap-3">
-                  <img src={product.image_urls[0]} alt="" className="h-12 w-12 shrink-0 object-contain" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold uppercase leading-tight">{product.name}</p>
-                    <p className="t-num mt-1 truncate text-[10px] text-concreto">{product.slug}</p>
-                    {product.supplier_sku && <p className="t-num text-[10px] text-cobalto">{product.supplier_sku}</p>}
+                <span>Produto</span>
+                <span>Categoria</span>
+                <span>Preço</span>
+                <span>Custo</span>
+                <span>Estoque</span>
+                <span className="w-[76px]">Ações</span>
+              </div>
+
+              {products.map(product => (
+                <div
+                  key={product.id}
+                  className="grid items-center gap-4 border-b border-linha px-4 py-3 transition-colors hover:bg-papel/50"
+                  style={{ gridTemplateColumns: '2.2fr 1fr 1fr 1fr 0.7fr auto' }}
+                >
+                  <div className="flex items-center gap-3">
+                    <img src={product.image_urls[0]} alt="" className="h-12 w-12 shrink-0 object-contain" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold uppercase leading-tight">{product.name}</p>
+                      <p className="t-num mt-1 truncate text-[10px] text-concreto">{product.slug}</p>
+                      {product.supplier_sku && <p className="t-num text-[10px] text-cobalto">{product.supplier_sku}</p>}
+                    </div>
+                  </div>
+                  <span className="t-label text-[10px] text-concreto">{categoryLabel(product.category)}</span>
+                  <span className="t-num text-sm text-marinho">{formatPrice(product.price_cents)}</span>
+                  <span className={cn('t-num text-sm', product.supplier_price_cents ? 'text-preto' : 'text-concreto/60')}>
+                    {product.supplier_price_cents ? formatPrice(product.supplier_price_cents) : '—'}
+                  </span>
+                  <span className={cn('t-num text-sm', product.stock <= 5 ? 'font-semibold text-cobalto' : 'text-preto')}>
+                    {product.stock}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openEdit(product)}
+                      className="border border-linha p-2 text-marinho transition-colors hover:border-cobalto hover:text-cobalto"
+                      aria-label={`Editar ${product.name}`}
+                    >
+                      <Edit size={14} />
+                    </button>
+                    <button
+                      onClick={() => deleteProduct(product.id)}
+                      className="border border-linha p-2 text-marinho transition-colors hover:border-cobalto hover:text-cobalto"
+                      aria-label={`Deletar ${product.name}`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
-                <span className="t-label text-[10px] text-concreto">{categoryLabel(product.category)}</span>
-                <span className="t-num text-sm text-marinho">{formatPrice(product.price_cents)}</span>
-                <span className={cn('t-num text-sm', product.supplier_price_cents ? 'text-preto' : 'text-concreto/60')}>
-                  {product.supplier_price_cents ? formatPrice(product.supplier_price_cents) : '—'}
-                </span>
-                <span className={cn('t-num text-sm', product.stock <= 5 ? 'font-semibold text-cobalto' : 'text-preto')}>
-                  {product.stock}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => openEdit(product)}
-                    className="border border-linha p-2 text-marinho transition-colors hover:border-cobalto hover:text-cobalto"
-                    aria-label={`Editar ${product.name}`}
-                  >
-                    <Edit size={14} />
-                  </button>
-                  <button
-                    onClick={() => deleteProduct(product.id)}
-                    className="border border-linha p-2 text-marinho transition-colors hover:border-cobalto hover:text-cobalto"
-                    aria-label={`Deletar ${product.name}`}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Pedidos */}
+        {tab === 'pedidos' && (
+          orders.length === 0 ? (
+            <div className="bg-branco p-8 text-center">
+              <p className="text-preto/75">Nenhum pedido ainda. Os pedidos feitos no checkout aparecem aqui.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto bg-branco">
+              <div className="min-w-[860px]">
+                <div
+                  className="t-label grid gap-4 border-b-2 border-marinho px-4 py-3 text-[10px] text-concreto"
+                  style={{ gridTemplateColumns: '0.6fr 0.9fr 1.8fr 1.2fr 0.6fr 1fr 0.8fr 1.3fr' }}
+                >
+                  <span>Nº</span>
+                  <span>Data</span>
+                  <span>Cliente</span>
+                  <span>Destino</span>
+                  <span>Itens</span>
+                  <span>Total</span>
+                  <span>Pagamento</span>
+                  <span>Status</span>
+                </div>
+                {orders.map(order => (
+                  <div
+                    key={order.id}
+                    className="grid items-center gap-4 border-b border-linha px-4 py-3 text-sm"
+                    style={{ gridTemplateColumns: '0.6fr 0.9fr 1.8fr 1.2fr 0.6fr 1fr 0.8fr 1.3fr' }}
+                  >
+                    <span className="t-num text-marinho">{orderNumber(order)}</span>
+                    <span className="t-num text-xs">{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{order.address.name}</p>
+                      <p className="truncate text-xs text-concreto">{order.email}</p>
+                    </div>
+                    <span className="text-xs">{order.address.city} / {order.address.state}</span>
+                    <span className="t-num text-xs">{itemCount(order)}</span>
+                    <span className="t-num text-marinho">{formatPrice(order.total_cents)}</span>
+                    <span className="text-xs">{order.payment_method ? PAYMENT_LABEL[order.payment_method] : '—'}</span>
+                    <span className="t-label text-[10px] text-cobalto">{ORDER_STATUS_LABEL[order.status]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        )}
       </div>
     </div>
   )

@@ -1,10 +1,12 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { authApi } from '@/lib/supabase'
-import { cn } from '@/lib/utils'
+import { accountsDb, ordersDb, type Account } from '@/lib/db'
+import type { Order } from '@/types'
+import { cn, formatPrice } from '@/lib/utils'
+import { ORDER_STATUS_LABEL, itemCount, orderNumber } from '@/lib/orders'
 import { Field } from '@/components/form/Field'
 
 const loginSchema = z.object({
@@ -24,37 +26,43 @@ type LoginForm = z.infer<typeof loginSchema>
 type RegisterForm = z.infer<typeof registerSchema>
 
 export function Conta() {
-  const navigate = useNavigate()
+  const [account, setAccount] = useState<Account | null>(null)
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    accountsDb.current().then(a => {
+      setAccount(a)
+      setChecking(false)
+    })
+  }, [])
+
+  if (checking) return null
+
+  return account
+    ? <MinhaConta account={account} onSignOut={() => setAccount(null)} />
+    : <Entrar onEnter={setAccount} />
+}
+
+function Entrar({ onEnter }: { onEnter: (account: Account) => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
 
   const loginForm = useForm<LoginForm>({ resolver: zodResolver(loginSchema) })
   const registerForm = useForm<RegisterForm>({ resolver: zodResolver(registerSchema) })
 
   async function onLogin(data: LoginForm) {
     setError('')
-    setNotice('')
     try {
-      await authApi.signIn(data.email, data.password)
-      navigate('/')
-    } catch {
-      setError('E-mail ou senha incorretos.')
+      onEnter(await accountsDb.signIn(data.email, data.password))
+    } catch (err) {
+      setError((err as Error).message)
     }
   }
 
   async function onRegister(data: RegisterForm) {
     setError('')
-    setNotice('')
     try {
-      const res = await authApi.signUp(data.email, data.password, data.name)
-      if (res.session) {
-        navigate('/')
-      } else {
-        // Projeto com confirmação de e-mail ligada: sessão só vem após confirmar.
-        setMode('login')
-        setNotice('Conta criada. Se chegar um e-mail de confirmação, confirme e depois entre.')
-      }
+      onEnter(await accountsDb.signUp(data.email, data.password, data.name))
     } catch (err) {
       setError((err as Error).message || 'Não deu pra criar a conta. Tente de novo.')
     }
@@ -91,7 +99,6 @@ export function Conta() {
       </div>
 
       {error && <p className="mt-6 border-l-2 border-marinho bg-branco p-4 text-sm font-semibold text-marinho">{error}</p>}
-      {notice && <p className="mt-6 border-l-2 border-cobalto bg-branco p-4 text-sm text-preto">{notice}</p>}
 
       {mode === 'login' ? (
         <form onSubmit={loginForm.handleSubmit(onLogin)} className="mt-6 flex flex-col gap-4" noValidate>
@@ -124,6 +131,56 @@ export function Conta() {
           </button>
         </form>
       )}
+    </div>
+  )
+}
+
+function MinhaConta({ account, onSignOut }: { account: Account; onSignOut: () => void }) {
+  const [orders, setOrders] = useState<Order[]>([])
+
+  useEffect(() => {
+    ordersDb.getByEmail(account.email).then(setOrders)
+  }, [account.email])
+
+  async function signOut() {
+    await accountsDb.signOut()
+    onSignOut()
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 pb-24 pt-10 md:pt-14">
+      <p className="t-label text-cobalto">Conta</p>
+      <h1 className="t-display mt-3 text-[clamp(2.4rem,6vw,3.75rem)] text-marinho">
+        Olá, {account.name.split(' ')[0]}.
+      </h1>
+      <p className="mt-4 text-preto/75">{account.email}</p>
+
+      <h2 className="t-label mt-12 text-marinho">Pedidos</h2>
+      {orders.length === 0 ? (
+        <div className="mt-4 bg-branco p-6">
+          <p className="text-preto/75">Nenhum pedido com esse e-mail ainda.</p>
+          <Link to="/loja" className="btn btn-primary mt-5">Ver jogos</Link>
+        </div>
+      ) : (
+        <ul className="mt-4 flex flex-col gap-3">
+          {orders.map(o => (
+            <li key={o.id} className="flex flex-wrap items-center justify-between gap-4 bg-branco p-5">
+              <div>
+                <p className="t-num text-sm text-marinho">Pedido {orderNumber(o)}</p>
+                <p className="mt-1 text-sm text-concreto">
+                  {new Date(o.created_at).toLocaleDateString('pt-BR')} · {itemCount(o)} itens
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="t-num text-sm">{formatPrice(o.total_cents)}</p>
+                <p className="t-label mt-1 text-[10px] text-cobalto">{ORDER_STATUS_LABEL[o.status]}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <button onClick={signOut} className="btn btn-outline mt-10">Sair</button>
     </div>
   )
 }

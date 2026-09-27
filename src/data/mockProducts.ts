@@ -2,9 +2,9 @@ import type { Product } from '@/types'
 
 const img = (slug: string) => `produtos/${slug}.webp`
 
-// Espelho do catálogo do banco (migrations 002 + 007 + 010). Usado no modo mock
-// e quando o Supabase não responde. Imagens em public/produtos: mockups do pitch
-// e embalagens renderizadas no padrão do manual. Todas ilustrativas.
+// Catálogo inicial: é com ele que o banco local nasce (lib/db.ts). Imagens em
+// public/produtos: mockups do pitch e embalagens renderizadas no padrão do
+// manual. Todas ilustrativas.
 export const mockProducts: Product[] = [
   {
     id: '1',
