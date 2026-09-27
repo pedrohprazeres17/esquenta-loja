@@ -4,18 +4,19 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { authApi } from '@/lib/supabase'
-import { FitaObra } from '@/components/brand'
+import { cn } from '@/lib/utils'
+import { Field } from '@/components/form/Field'
 
 const loginSchema = z.object({
-  email: z.string().email('Email invalido'),
-  password: z.string().min(6, 'Minimo 6 caracteres'),
+  email: z.string().email('E-mail inválido'),
+  password: z.string().min(6, 'Mínimo de 6 caracteres'),
 })
 
 const registerSchema = loginSchema.extend({
-  name: z.string().min(3, 'Nome obrigatorio'),
+  name: z.string().min(3, 'Nome obrigatório'),
   confirmPassword: z.string(),
 }).refine(d => d.password === d.confirmPassword, {
-  message: 'Senhas nao conferem',
+  message: 'As senhas não batem',
   path: ['confirmPassword'],
 })
 
@@ -38,7 +39,7 @@ export function Conta() {
       await authApi.signIn(data.email, data.password)
       navigate('/')
     } catch {
-      setError('Email ou senha incorretos.')
+      setError('E-mail ou senha incorretos.')
     }
   }
 
@@ -52,99 +53,74 @@ export function Conta() {
       } else {
         // Projeto com confirmação de e-mail ligada: sessão só vem após confirmar.
         setMode('login')
-        setNotice('Conta criada! Se pedirem, confirme o e-mail e então entre.')
+        setNotice('Conta criada. Se chegar um e-mail de confirmação, confirme e depois entre.')
       }
     } catch (err) {
-      setError((err as Error).message || 'Erro ao criar conta. Tente novamente.')
+      setError((err as Error).message || 'Não deu pra criar a conta. Tente de novo.')
     }
   }
 
+  const le = loginForm.formState.errors
+  const re = registerForm.formState.errors
+
   return (
-    <div className="max-w-md mx-auto px-4 py-16">
-      <h1
-        className="section-title mb-2"
-        style={{ fontFamily: 'Anton, sans-serif', fontSize: 'clamp(2rem, 6vw, 4rem)', color: 'var(--papel)' }}
-      >
-        {mode === 'login' ? 'ENTRAR.' : 'CRIAR CONTA.'}
+    <div className="mx-auto max-w-md px-4 pb-24 pt-10 md:pt-14">
+      <p className="t-label text-cobalto">Conta</p>
+      <h1 className="t-display mt-3 text-[clamp(2.4rem,6vw,3.75rem)] text-marinho">
+        {mode === 'login' ? 'Entrar.' : 'Criar conta.'}
       </h1>
-      <p className="font-mono text-sm mb-10" style={{ color: 'color-mix(in srgb, var(--papel) 50%, transparent)' }}>
-        {mode === 'login' ? 'Acesse sua conta ESQUENTA.' : 'Crie sua conta. E-commerce adult BR.'}
+      <p className="mt-4 text-preto/75">
+        {mode === 'login' ? 'Pra acompanhar pedido e salvar endereço.' : 'Cadastro só pra maiores de 18.'}
       </p>
 
-      <FitaObra height="6px" className="mb-8" />
-
-      {/* Tab switcher */}
-      <div className="flex border-2 mb-8" style={{ borderColor: 'var(--papel)' }}>
-        {(['login', 'register'] as const).map((m, i) => (
+      <div className="mt-8 flex border-b border-linha">
+        {(['login', 'register'] as const).map(m => (
           <button
             key={m}
             type="button"
             onClick={() => { setMode(m); setError('') }}
-            className="flex-1 py-3 font-display uppercase text-sm transition-colors"
-            style={{
-              fontFamily: 'Anton, sans-serif',
-              backgroundColor: mode === m ? 'var(--vermelho)' : 'transparent',
-              color: mode === m ? 'var(--papel)' : 'color-mix(in srgb, var(--papel) 60%, transparent)',
-              borderRight: i === 0 ? '2px solid var(--papel)' : 'none',
-            }}
+            aria-pressed={mode === m}
+            className={cn(
+              't-label -mb-px flex-1 border-b-2 pb-3 transition-colors',
+              mode === m ? 'border-cobalto text-marinho' : 'border-transparent text-concreto hover:text-marinho',
+            )}
           >
-            {m === 'login' ? 'ENTRAR' : 'CADASTRAR'}
+            {m === 'login' ? 'Entrar' : 'Cadastrar'}
           </button>
         ))}
       </div>
 
-      {error && (
-        <p className="font-mono text-sm mb-4 p-3 border-2" style={{ borderColor: 'var(--vermelho)', color: 'var(--vermelho)' }}>
-          {error}
-        </p>
-      )}
-
-      {notice && (
-        <p className="font-mono text-sm mb-4 p-3 border-2" style={{ borderColor: 'var(--amarelo)', color: 'var(--amarelo)' }}>
-          {notice}
-        </p>
-      )}
+      {error && <p className="mt-6 border-l-2 border-marinho bg-branco p-4 text-sm font-semibold text-marinho">{error}</p>}
+      {notice && <p className="mt-6 border-l-2 border-cobalto bg-branco p-4 text-sm text-preto">{notice}</p>}
 
       {mode === 'login' ? (
-        <form onSubmit={loginForm.handleSubmit(onLogin)} className="flex flex-col gap-4">
-          <div>
-            <label className="font-mono text-xs uppercase mb-1 block" style={{ color: 'color-mix(in srgb, var(--papel) 60%, transparent)' }}>EMAIL</label>
-            <input {...loginForm.register('email')} type="email" placeholder="seu@email.com" />
-            {loginForm.formState.errors.email && <p className="font-mono text-xs mt-1" style={{ color: 'var(--vermelho)' }}>{loginForm.formState.errors.email.message}</p>}
-          </div>
-          <div>
-            <label className="font-mono text-xs uppercase mb-1 block" style={{ color: 'color-mix(in srgb, var(--papel) 60%, transparent)' }}>SENHA</label>
-            <input {...loginForm.register('password')} type="password" placeholder="••••••••" />
-            {loginForm.formState.errors.password && <p className="font-mono text-xs mt-1" style={{ color: 'var(--vermelho)' }}>{loginForm.formState.errors.password.message}</p>}
-          </div>
-          <button type="submit" className="btn btn-primary w-full mt-2" disabled={loginForm.formState.isSubmitting}>
-            {loginForm.formState.isSubmitting ? 'ENTRANDO...' : 'ENTRAR'}
+        <form onSubmit={loginForm.handleSubmit(onLogin)} className="mt-6 flex flex-col gap-4" noValidate>
+          <Field label="E-mail" error={le.email?.message}>
+            <input {...loginForm.register('email')} type="email" placeholder="seu@email.com" autoComplete="email" />
+          </Field>
+          <Field label="Senha" error={le.password?.message}>
+            <input {...loginForm.register('password')} type="password" placeholder="••••••••" autoComplete="current-password" />
+          </Field>
+          <button type="submit" className="btn btn-primary mt-2 w-full" disabled={loginForm.formState.isSubmitting}>
+            {loginForm.formState.isSubmitting ? 'Entrando' : 'Entrar'}
           </button>
         </form>
       ) : (
-        <form onSubmit={registerForm.handleSubmit(onRegister)} className="flex flex-col gap-4">
-          <div>
-            <label className="font-mono text-xs uppercase mb-1 block" style={{ color: 'color-mix(in srgb, var(--papel) 60%, transparent)' }}>NOME</label>
-            <input {...registerForm.register('name')} placeholder="Seu nome" />
-            {registerForm.formState.errors.name && <p className="font-mono text-xs mt-1" style={{ color: 'var(--vermelho)' }}>{registerForm.formState.errors.name.message}</p>}
-          </div>
-          <div>
-            <label className="font-mono text-xs uppercase mb-1 block" style={{ color: 'color-mix(in srgb, var(--papel) 60%, transparent)' }}>EMAIL</label>
-            <input {...registerForm.register('email')} type="email" placeholder="seu@email.com" />
-            {registerForm.formState.errors.email && <p className="font-mono text-xs mt-1" style={{ color: 'var(--vermelho)' }}>{registerForm.formState.errors.email.message}</p>}
-          </div>
-          <div>
-            <label className="font-mono text-xs uppercase mb-1 block" style={{ color: 'color-mix(in srgb, var(--papel) 60%, transparent)' }}>SENHA</label>
-            <input {...registerForm.register('password')} type="password" placeholder="••••••••" />
-            {registerForm.formState.errors.password && <p className="font-mono text-xs mt-1" style={{ color: 'var(--vermelho)' }}>{registerForm.formState.errors.password.message}</p>}
-          </div>
-          <div>
-            <label className="font-mono text-xs uppercase mb-1 block" style={{ color: 'color-mix(in srgb, var(--papel) 60%, transparent)' }}>CONFIRMAR SENHA</label>
-            <input {...registerForm.register('confirmPassword')} type="password" placeholder="••••••••" />
-            {registerForm.formState.errors.confirmPassword && <p className="font-mono text-xs mt-1" style={{ color: 'var(--vermelho)' }}>{registerForm.formState.errors.confirmPassword.message}</p>}
-          </div>
-          <button type="submit" className="btn btn-primary w-full mt-2" disabled={registerForm.formState.isSubmitting}>
-            {registerForm.formState.isSubmitting ? 'CRIANDO...' : 'CRIAR CONTA'}
+        <form onSubmit={registerForm.handleSubmit(onRegister)} className="mt-6 flex flex-col gap-4" noValidate>
+          <Field label="Nome" error={re.name?.message}>
+            <input {...registerForm.register('name')} placeholder="Seu nome" autoComplete="name" />
+          </Field>
+          <Field label="E-mail" error={re.email?.message}>
+            <input {...registerForm.register('email')} type="email" placeholder="seu@email.com" autoComplete="email" />
+          </Field>
+          <Field label="Senha" error={re.password?.message}>
+            <input {...registerForm.register('password')} type="password" placeholder="••••••••" autoComplete="new-password" />
+          </Field>
+          <Field label="Confirmar senha" error={re.confirmPassword?.message}>
+            <input {...registerForm.register('confirmPassword')} type="password" placeholder="••••••••" autoComplete="new-password" />
+          </Field>
+          <button type="submit" className="btn btn-primary mt-2 w-full" disabled={registerForm.formState.isSubmitting}>
+            {registerForm.formState.isSubmitting ? 'Criando' : 'Criar conta'}
           </button>
         </form>
       )}

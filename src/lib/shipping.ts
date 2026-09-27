@@ -25,7 +25,7 @@ export interface ShippingResult {
 const FALLBACK_OPTION: ShippingOption = {
   id: 0,
   name: 'Frete padrão',
-  company: 'ESQUENTA',
+  company: 'Spark',
   price_cents: 2490,
   delivery_days: 7,
 }

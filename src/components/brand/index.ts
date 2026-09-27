@@ -1,4 +1,3 @@
 export { Logo, LogoStatic } from './Logo'
-export { Ticker } from './Ticker'
-export { FitaObra } from './FitaObra'
-export { Carimbo, EdicaoLimitada, Badge18 } from './Carimbo'
+export { Estrela, Globo } from './Elementos'
+export { Selo18, Lote, Mira } from './Componentes'

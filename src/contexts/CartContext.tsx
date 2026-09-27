@@ -10,7 +10,6 @@ type CartAction =
   | { type: 'REMOVE'; productId: string }
   | { type: 'UPDATE_QTY'; productId: string; quantity: number }
   | { type: 'CLEAR' }
-  | { type: 'HYDRATE'; items: CartItem[] }
 
 interface CartContextValue extends CartState {
   addItem: (product: Product, quantity?: number) => void
@@ -23,9 +22,6 @@ interface CartContextValue extends CartState {
 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
-    case 'HYDRATE':
-      return { items: action.items }
-
     case 'ADD': {
       const existing = state.items.find(i => i.product.id === action.product.id)
       const qty = action.quantity ?? 1
@@ -64,20 +60,22 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 
 const CartContext = createContext<CartContextValue | null>(null)
 
-const STORAGE_KEY = 'esquenta-cart'
+const STORAGE_KEY = 'spark-cart'
+
+// Lido já na criação do estado: se viesse num efeito, o primeiro render teria
+// carrinho vazio e o checkout aberto direto (ou com F5) mandava pro carrinho.
+function loadCart(): CartState {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    return { items: saved ? JSON.parse(saved) : [] }
+  } catch {
+    /* carrinho corrompido no localStorage — ignora e começa vazio */
+    return { items: [] }
+  }
+}
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(cartReducer, { items: [] })
-
-  // Hydrate from localStorage
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) dispatch({ type: 'HYDRATE', items: JSON.parse(saved) })
-    } catch {
-      /* carrinho corrompido no localStorage — ignora e começa vazio */
-    }
-  }, [])
+  const [state, dispatch] = useReducer(cartReducer, undefined, loadCart)
 
   // Persist to localStorage
   useEffect(() => {

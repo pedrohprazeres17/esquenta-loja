@@ -1,4 +1,4 @@
-name: Deploy ESQUENTA to GitHub Pages
+name: Deploy Spark to GitHub Pages
 
 on:
   push:

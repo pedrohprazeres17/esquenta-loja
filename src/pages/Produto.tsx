@@ -1,34 +1,32 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ChevronDown, ShoppingCart, ArrowLeft } from 'lucide-react'
+import { ChevronDown, ArrowLeft, Minus, Plus } from 'lucide-react'
 import { getProductBySlug, getAllProducts } from '@/data/products'
+import { getProductDetails } from '@/data/productDetails'
 import type { Product } from '@/types'
-import { formatPrice } from '@/lib/utils'
+import { cn, formatPrice } from '@/lib/utils'
+import { categoryLabel } from '@/lib/categories'
 import { useCart } from '@/contexts/CartContext'
-import { EdicaoLimitada, Badge18, Carimbo } from '@/components/brand'
+import { Lote, Mira, Selo18 } from '@/components/brand'
 import { ProductCard } from '@/components/product/ProductCard'
 
 function Accordion({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="border-t-2" style={{ borderColor: 'color-mix(in srgb, var(--papel) 20%, transparent)' }}>
+    <div className="border-b border-linha">
       <button
-        className="w-full flex items-center justify-between py-4 text-left"
+        className="flex w-full items-center justify-between py-4 text-left"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
       >
-        <span className="font-mono text-sm uppercase tracking-wider" style={{ color: 'var(--papel)' }}>
-          {title}
-        </span>
+        <span className="t-label text-marinho">{title}</span>
         <ChevronDown
           size={16}
-          style={{ color: 'var(--vermelho)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 200ms' }}
+          strokeWidth={1.5}
+          className={cn('text-cobalto transition-transform duration-200', open && 'rotate-180')}
         />
       </button>
-      {open && (
-        <div className="pb-4 font-mono text-sm" style={{ color: 'color-mix(in srgb, var(--papel) 70%, transparent)', lineHeight: 1.8 }}>
-          {children}
-        </div>
-      )}
+      {open && <div className="pb-5 text-[15px] leading-relaxed text-preto/80">{children}</div>}
     </div>
   )
 }
@@ -50,11 +48,15 @@ export function Produto() {
     /* eslint-disable react-hooks/set-state-in-effect */
     setLoading(true)
     setActiveImg(0)
+    setQty(1)
     /* eslint-enable react-hooks/set-state-in-effect */
     Promise.all([getProductBySlug(slug), getAllProducts()]).then(([p, all]) => {
       if (!active) return
       setProduct(p)
-      setRelated(all.filter(x => x.id !== p?.id).slice(0, 4))
+      // Mesma categoria primeiro, depois o resto.
+      const others = all.filter(x => x.id !== p?.id)
+      const sameCategory = others.filter(x => x.category === p?.category)
+      setRelated([...sameCategory, ...others.filter(x => x.category !== p?.category)].slice(0, 4))
       setLoading(false)
     })
     return () => {
@@ -63,23 +65,20 @@ export function Produto() {
   }, [slug])
 
   if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-32 text-center">
-        <p className="font-mono" style={{ color: 'color-mix(in srgb, var(--papel) 60%, transparent)' }}>Carregando...</p>
-      </div>
-    )
+    return <p className="mx-auto max-w-7xl px-4 py-32 text-center text-concreto">Carregando.</p>
   }
 
   if (!product) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-32 text-center">
-        <p className="font-mono" style={{ color: 'var(--papel)' }}>Produto nao encontrado.</p>
-        <Link to="/loja" className="btn btn-outline mt-8 inline-flex">VER LOJA</Link>
+      <div className="mx-auto max-w-2xl px-4 py-28 text-center">
+        <h1 className="t-display text-4xl text-marinho">Produto não encontrado.</h1>
+        <Link to="/loja" className="btn btn-primary mt-10">Ver jogos</Link>
       </div>
     )
   }
 
-  const hasDrink = ['beer-pong', 'copos'].includes(product.category)
+  const details = getProductDetails(product)
+  const esgotado = product.stock === 0
 
   function handleAddToCart() {
     if (!product) return
@@ -90,178 +89,149 @@ export function Produto() {
 
   return (
     <div>
-      <div className="max-w-7xl mx-auto px-4 py-10">
-        {/* back */}
-        <Link to="/loja" className="inline-flex items-center gap-2 font-mono text-sm mb-10 hover:text-vermelho transition-colors" style={{ color: 'color-mix(in srgb, var(--papel) 50%, transparent)' }}>
-          <ArrowLeft size={14} /> VOLTAR PRA LOJA
+      <div className="mx-auto max-w-7xl px-4 pb-16 pt-6 sm:px-6 md:pt-10">
+        <Link
+          to={`/loja?categoria=${product.category}`}
+          className="t-label inline-flex items-center gap-2 text-concreto transition-colors hover:text-cobalto"
+        >
+          <ArrowLeft size={14} strokeWidth={1.5} /> {categoryLabel(product.category)}
         </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Gallery */}
-          <div className="flex gap-3">
-            {/* Thumbnails */}
+        <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16">
+          {/* Imagem */}
+          <div className="flex flex-col gap-3">
+            <Mira className="bg-branco p-6 sm:p-10">
+              <img
+                src={product.image_urls[activeImg]}
+                alt={product.name}
+                className="mx-auto aspect-square w-full max-w-[560px] object-contain"
+              />
+            </Mira>
             {product.image_urls.length > 1 && (
-              <div className="flex flex-col gap-2 w-16 shrink-0">
+              <div className="flex gap-2">
                 {product.image_urls.map((url, i) => (
                   <button
                     key={i}
                     onClick={() => setActiveImg(i)}
-                    className="w-16 h-16 border-2 overflow-hidden"
-                    style={{ borderColor: activeImg === i ? 'var(--vermelho)' : 'var(--papel)' }}
+                    className={cn('h-16 w-16 border-2 bg-branco p-1', activeImg === i ? 'border-cobalto' : 'border-transparent')}
+                    aria-label={`Imagem ${i + 1}`}
                   >
-                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <img src={url} alt="" className="h-full w-full object-contain" />
                   </button>
                 ))}
               </div>
             )}
-            {/* Main image */}
-            <div className="flex-1 border-2 overflow-hidden relative" style={{ borderColor: 'var(--papel)' }}>
-              <img
-                src={product.image_urls[activeImg]}
-                alt={product.name}
-                className="w-full object-cover"
-                style={{ aspectRatio: '3/4' }}
-              />
-              {product.is_featured && (
-                <div className="absolute top-4 right-4">
-                  <Carimbo size={90} />
-                </div>
-              )}
-            </div>
+            <p className="t-label text-[10px] text-concreto">Imagem ilustrativa</p>
           </div>
 
-          {/* Info */}
-          <div className="flex flex-col gap-4">
-            {/* Category + badges */}
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-xs uppercase tracking-widest" style={{ color: 'color-mix(in srgb, var(--papel) 50%, transparent)' }}>
-                {product.category.replace('-', ' ')}
-              </span>
-              {hasDrink && <Badge18 />}
+          {/* Informação */}
+          <div className="flex flex-col">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="t-label text-cobalto">{categoryLabel(product.category)}</span>
+              <Selo18 className="text-marinho" />
+              {product.is_limited && product.edition_number && product.max_edition && (
+                <Lote numero={product.edition_number} total={product.max_edition} className="text-marinho" />
+              )}
             </div>
 
-            {/* Name */}
-            <h1
-              className="section-title"
-              style={{ fontFamily: 'Anton, sans-serif', fontSize: 'clamp(2.5rem, 6vw, 5rem)', color: 'var(--papel)', lineHeight: 0.95 }}
-            >
-              {product.name}
-            </h1>
+            <h1 className="t-display mt-4 text-[clamp(2.2rem,4.6vw,3.75rem)] text-marinho">{product.name}</h1>
+            <p className="mt-5 text-lg leading-relaxed text-preto/85">{product.description}</p>
 
-            {product.is_limited && product.edition_number && product.max_edition && (
-              <EdicaoLimitada numero={product.edition_number} total={product.max_edition} />
-            )}
-
-            {/* Price */}
-            <div className="flex items-baseline gap-1 mt-2">
-              <span className="font-mono text-sm" style={{ color: 'color-mix(in srgb, var(--papel) 60%, transparent)' }}>R$</span>
-              <span
-                className="section-title"
-                style={{ fontFamily: 'Anton, sans-serif', fontSize: 'clamp(2rem, 5vw, 3.5rem)', color: 'var(--vermelho)' }}
-              >
-                {(product.price_cents / 100).toFixed(2).replace('.', ',')}
-              </span>
+            <div className="mt-8 border-t border-linha pt-6">
+              <p className="t-num text-[2rem] leading-none text-marinho">{formatPrice(product.price_cents)}</p>
+              <p className="t-label mt-3 text-concreto">
+                {formatPrice(Math.floor(product.price_cents * 0.95))} no PIX · 5% off
+              </p>
             </div>
 
-            {/* PIX note */}
-            <p className="font-mono text-xs" style={{ color: 'var(--amarelo)' }}>
-              5% de desconto no PIX — {formatPrice(Math.floor(product.price_cents * 0.95))}
-            </p>
-
-            {/* Description */}
-            <p className="font-mono text-sm mt-2" style={{ color: 'color-mix(in srgb, var(--papel) 80%, transparent)', lineHeight: 1.8 }}>
-              {product.description}
-            </p>
-
-            {/* Quantity + CTA */}
-            <div className="flex gap-3 mt-4">
-              <div className="flex border-2" style={{ borderColor: 'var(--papel)' }}>
+            <div className="mt-6 flex gap-3">
+              <div className="flex items-center border border-marinho/40 bg-branco">
                 <button
-                  className="w-10 h-10 font-mono text-lg flex items-center justify-center hover:bg-vermelho hover:text-papel transition-colors"
-                  style={{ color: 'var(--papel)' }}
+                  className="flex h-[52px] w-11 items-center justify-center text-marinho transition-colors hover:bg-papel disabled:opacity-40"
                   onClick={() => setQty(q => Math.max(1, q - 1))}
+                  disabled={qty <= 1}
+                  aria-label="Diminuir quantidade"
                 >
-                  -
+                  <Minus size={14} />
                 </button>
-                <span className="w-10 h-10 flex items-center justify-center font-mono" style={{ color: 'var(--papel)' }}>
-                  {qty}
-                </span>
+                <span className="t-num w-8 text-center text-sm" aria-live="polite">{qty}</span>
                 <button
-                  className="w-10 h-10 font-mono text-lg flex items-center justify-center hover:bg-vermelho hover:text-papel transition-colors"
-                  style={{ color: 'var(--papel)' }}
+                  className="flex h-[52px] w-11 items-center justify-center text-marinho transition-colors hover:bg-papel disabled:opacity-40"
                   onClick={() => setQty(q => Math.min(product.stock, q + 1))}
+                  disabled={qty >= product.stock}
+                  aria-label="Aumentar quantidade"
                 >
-                  +
+                  <Plus size={14} />
                 </button>
               </div>
 
-              <button
-                onClick={handleAddToCart}
-                className="btn btn-primary flex-1 flex items-center justify-center gap-2"
-                disabled={product.stock === 0}
-              >
-                <ShoppingCart size={16} />
-                {added ? 'ADICIONADO!' : product.stock === 0 ? 'ESGOTADO' : 'ADICIONAR AO CARRINHO'}
+              <button onClick={handleAddToCart} className="btn btn-primary min-w-0 flex-1" disabled={esgotado}>
+                {added ? 'No carrinho' : esgotado ? 'Esgotado' : (
+                  <>
+                    <span className="sm:hidden">Adicionar</span>
+                    <span className="hidden sm:inline">Adicionar ao carrinho</span>
+                  </>
+                )}
               </button>
             </div>
 
-            <p className="font-mono text-xs" style={{ color: 'color-mix(in srgb, var(--papel) 40%, transparent)' }}>
-              Ressaca devolve em 7 dias. Frete gratis acima de R$ 150.
-            </p>
+            {product.stock <= 10 && product.stock > 0 && (
+              <p className="t-label mt-4 text-cobalto">Últimas {product.stock} unidades</p>
+            )}
 
-            {/* Accordions */}
-            <div className="mt-4">
-              {product.category === 'cartas' && (
-                <Accordion title="REGRAS DO JOGO">
-                  220 cartas divididas em 4 categorias. Cada rodada, o carteador embaralha e distribui 3 cartas pra cada jogador. Quem puxar a carta de acao executa ou distribui. Minimo 3 pessoas. Recomendado 4-8. Duracao media: 60 minutos (ou ate alguem ir embora).
+            <ul className="mt-5 flex flex-col gap-1 text-sm text-concreto">
+              <li>7 dias pra devolver. Sem pergunta.</li>
+              <li>Frete grátis acima de R$ 150.</li>
+            </ul>
+
+            {/* Etiqueta */}
+            {details.ficha.length > 0 && (
+              <div className="mt-10">
+                <h2 className="t-label text-marinho">Ficha</h2>
+                <dl className="mt-3 border-t-2 border-marinho">
+                  {details.ficha.map(row => (
+                    <div key={row.label} className="flex items-baseline justify-between gap-6 border-b border-linha py-3">
+                      <dt className="t-label text-[10px] text-concreto">{row.label}</dt>
+                      <dd className="t-num text-right text-sm text-preto">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+
+            <div className="mt-8 border-t border-linha">
+              {details.caixa.length > 0 && (
+                <Accordion title="O que vem na caixa">
+                  <ul className="flex flex-col gap-1">
+                    {details.caixa.map(item => <li key={item}>{item}</li>)}
+                  </ul>
                 </Accordion>
               )}
-              <Accordion title="CONTEUDO DA CAIXA">
-                {product.category === 'cartas' && '220 cartas impressas · Regras em PT-BR · Embalagem colecao'}
-                {product.category === 'beer-pong' && 'Mesa dobravel 240cm · 22 copos ESQUENTA · 4 bolinhas de ping-pong · Manual de regras'}
-                {product.category === 'copos' && 'Copo dupla camada 500ml · Tampa com encaixe · Certificado de autenticidade'}
-                {product.category === 'kits' && 'Cartas ESQUENTA (220un) · Copo 500ml · Dados pack (6un) · Caixa exclusiva numerada'}
-                {product.category === 'acessorios' && '6 dados personalizados · Bolsa de veludo · Instrucoes'}
-              </Accordion>
-              <Accordion title="FRETE E TROCA">
-                Frete gratis pra todo o Brasil em pedidos acima de R$ 150. Prazo de 5-10 dias uteis. Devolucao em ate 7 dias apos recebimento. Produto precisa estar sem uso e na embalagem original.
+              {details.comoJoga && <Accordion title="Como joga">{details.comoJoga}</Accordion>}
+              <Accordion title="Frete e troca">
+                Frete calculado pelo CEP no checkout, com prazo de acordo com a região. Grátis acima de R$ 150.
+                7 dias pra devolver, sem pergunta: produto sem uso e na embalagem original.
               </Accordion>
             </div>
-
-            {/* Stock */}
-            {product.stock <= 10 && product.stock > 0 && (
-              <p className="font-mono text-xs" style={{ color: 'var(--amarelo)' }}>
-                ULTIMAS {product.stock} UNIDADES
-              </p>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Sticky mobile bar */}
-      <div
-        className="lg:hidden sticky bottom-0 z-50 border-t-2 px-4 py-3 flex items-center justify-between gap-4"
-        style={{ backgroundColor: 'var(--preto)', borderColor: 'var(--vermelho)' }}
-      >
-        <span className="section-title text-xl" style={{ fontFamily: 'Anton, sans-serif', color: 'var(--vermelho)' }}>
-          {formatPrice(product.price_cents)}
-        </span>
-        <button onClick={handleAddToCart} className="btn btn-primary flex-1 max-w-xs">
-          {added ? 'ADICIONADO!' : 'COMPRAR'}
+      {/* Barra fixa no celular */}
+      <div className="sticky bottom-0 z-40 flex items-center justify-between gap-4 border-t border-linha bg-branco px-4 py-3 lg:hidden">
+        <span className="t-num text-lg text-marinho">{formatPrice(product.price_cents)}</span>
+        <button onClick={handleAddToCart} className="btn btn-primary max-w-xs flex-1" disabled={esgotado}>
+          {added ? 'No carrinho' : esgotado ? 'Esgotado' : 'Adicionar'}
         </button>
       </div>
 
-      {/* Related */}
       {related.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 py-16">
-          <h2
-            className="section-title mb-8"
-            style={{ fontFamily: 'Anton, sans-serif', fontSize: 'clamp(1.5rem, 4vw, 3rem)', color: 'var(--papel)' }}
-          >
-            QUEM COMPROU LEVOU TAMBEM
-          </h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {related.map(p => <ProductCard key={p.id} product={p} />)}
+        <section className="border-t border-linha">
+          <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
+            <h2 className="t-display text-[clamp(1.75rem,3.5vw,2.75rem)] text-marinho">Veja também.</h2>
+            <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+              {related.map(p => <ProductCard key={p.id} product={p} />)}
+            </div>
           </div>
         </section>
       )}

@@ -1,77 +1,64 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ShoppingCart } from 'lucide-react'
+import { Check, Plus } from 'lucide-react'
 import type { Product } from '@/types'
 import { formatPrice } from '@/lib/utils'
+import { categoryLabel } from '@/lib/categories'
 import { useCart } from '@/contexts/CartContext'
-import { EdicaoLimitada, Badge18 } from '@/components/brand'
+import { Lote } from '@/components/brand'
 
-interface ProductCardProps {
-  product: Product
-  featured?: boolean
-}
-
-export function ProductCard({ product, featured = false }: ProductCardProps) {
+export function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart()
-  const hasDrink = ['beer-pong', 'copos'].includes(product.category)
+  const [added, setAdded] = useState(false)
+  const esgotado = product.stock === 0
+
+  useEffect(() => {
+    if (!added) return
+    const t = setTimeout(() => setAdded(false), 1400)
+    return () => clearTimeout(t)
+  }, [added])
 
   return (
-    <div
-      className="card-hover flex flex-col border-2 bg-preto"
-      style={{ borderColor: 'var(--papel)' }}
-    >
-      {/* Image */}
-      <Link to={`/produto/${product.slug}`} className="block overflow-hidden relative">
+    <article className="group flex flex-col bg-branco">
+      <Link to={`/produto/${product.slug}`} className="relative block aspect-square overflow-hidden">
         <img
           src={product.image_urls[0]}
           alt={product.name}
-          className="w-full object-cover"
-          style={{ aspectRatio: featured ? '3/4' : '1/1' }}
+          className="h-full w-full object-contain p-3 transition-transform duration-300 group-hover:scale-[1.03] sm:p-5"
           loading="lazy"
         />
-        {/* badges overlay */}
-        <div className="absolute top-2 left-2 flex flex-col gap-1">
-          {product.is_limited && <span className="text-xs px-1.5 py-0.5"
-            style={{ backgroundColor: 'var(--vermelho)', color: 'var(--papel)', fontFamily: 'Anton, sans-serif', fontSize: '10px', letterSpacing: '0.1em' }}>
-            LIMITADO
-          </span>}
-          {hasDrink && <Badge18 />}
-        </div>
+        {product.is_limited && product.edition_number && product.max_edition && (
+          <Lote numero={product.edition_number} total={product.max_edition} className="absolute left-3 top-3 text-cobalto" />
+        )}
       </Link>
 
-      {/* Info */}
-      <div className="flex flex-col gap-2 p-4 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-col gap-1 flex-1">
-            <span className="font-mono text-xs uppercase"
-              style={{ color: 'color-mix(in srgb, var(--papel) 50%, transparent)', letterSpacing: '0.1em' }}>
-              {product.category.replace('-', ' ')}
-            </span>
-            <Link to={`/produto/${product.slug}`}>
-              <h3 className="section-title text-xl hover:text-vermelho transition-colors leading-tight"
-                style={{ fontFamily: 'Anton, sans-serif', color: 'var(--papel)' }}>
-                {product.name}
-              </h3>
-            </Link>
-            {product.is_limited && product.edition_number && product.max_edition && (
-              <EdicaoLimitada numero={product.edition_number} total={product.max_edition} />
-            )}
-          </div>
-          <span className="section-title text-xl whitespace-nowrap"
-            style={{ fontFamily: 'Anton, sans-serif', color: 'var(--vermelho)' }}>
-            {formatPrice(product.price_cents)}
-          </span>
+      <div className="flex flex-1 flex-col gap-4 border-t border-linha p-3 sm:p-4">
+        <div className="flex flex-col gap-1.5">
+          <span className="t-label text-[10px] text-concreto">{categoryLabel(product.category)}</span>
+          <Link to={`/produto/${product.slug}`}>
+            <h3 className="text-[15px] font-semibold uppercase leading-tight tracking-[0.01em] text-preto transition-colors group-hover:text-cobalto">
+              {product.name}
+            </h3>
+          </Link>
         </div>
 
-        <button
-          onClick={() => addItem(product)}
-          className="btn btn-primary w-full mt-auto flex items-center justify-center gap-2"
-          style={{ fontSize: '13px', padding: '0.6rem 1rem' }}
-          disabled={product.stock === 0}
-        >
-          <ShoppingCart size={14} />
-          {product.stock === 0 ? 'ESGOTADO' : 'ADICIONAR'}
-        </button>
+        <div className="mt-auto flex items-center justify-between gap-3">
+          <span className="t-num text-sm text-marinho sm:text-[15px]">
+            {esgotado ? 'Esgotado' : formatPrice(product.price_cents)}
+          </span>
+          <button
+            onClick={() => {
+              addItem(product)
+              setAdded(true)
+            }}
+            className="btn btn-primary btn-icon shrink-0"
+            disabled={esgotado}
+            aria-label={`Adicionar ${product.name} ao carrinho`}
+          >
+            {added ? <Check size={16} strokeWidth={2} /> : <Plus size={16} strokeWidth={2} />}
+          </button>
+        </div>
       </div>
-    </div>
+    </article>
   )
 }

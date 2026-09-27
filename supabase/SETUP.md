@@ -36,7 +36,7 @@ where user_id = (select id from auth.users where email = 'voce@email.com');
 A função está **deployada** e o checkout já calcula o frete **sem você configurar nada**.
 Ela tem duas fontes:
 
-- **Motor ESQUENTA (padrão):** tabela própria por região do CEP (origem SP) + peso do
+- **Motor próprio (padrão):** tabela própria por região do CEP (origem SP) + peso do
   carrinho. Devolve duas opções — **Padrão** e **Expressa** — com preço e prazo. Zero
   dependência externa. Ex.: SP ~R$ 15,90/3d · Nordeste ~R$ 39,90/10d · Norte ~R$ 34,90/13d.
 - **Melhor Envio (opcional, upgrade):** se você setar os secrets abaixo, a função passa a

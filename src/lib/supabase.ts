@@ -51,12 +51,16 @@ export type Database = {
 }
 
 /* ── Product queries ─────────────────────────────────────── */
+// As leituras do catálogo não repetem a requisição em erro de rede: quem chama
+// (data/products.ts) já cai no catálogo local. Com retry, um banco fora do ar
+// segurava cada página por ~8 s.
 export const productsApi = {
   async getAll() {
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .order('created_at', { ascending: false })
+      .retry(false)
     if (error) throw error
     return data as Product[]
   },
@@ -66,9 +70,10 @@ export const productsApi = {
       .from('products')
       .select('*')
       .eq('slug', slug)
-      .single()
+      .maybeSingle()
+      .retry(false)
     if (error) throw error
-    return data as Product
+    return data as Product | null
   },
 
   async getByCategory(category: string) {
@@ -77,6 +82,7 @@ export const productsApi = {
       .select('*')
       .eq('category', category)
       .order('created_at', { ascending: false })
+      .retry(false)
     if (error) throw error
     return data as Product[]
   },
@@ -87,6 +93,7 @@ export const productsApi = {
       .select('*')
       .eq('is_featured', true)
       .limit(4)
+      .retry(false)
     if (error) throw error
     return data as Product[]
   },

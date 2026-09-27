@@ -1,50 +1,38 @@
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import logoBranco from '@/assets/brand/logo-branco.svg'
+import logoMarinho from '@/assets/brand/logo-marinho.svg'
+
+// Logo oficial em contorno (marca/logo). Não redesenhar nem distorcer.
+// Marinho sobre papel é a principal; branco sobre cobalto é a negativa.
+// Mínimo de 200 px de largura na tela.
+const versoes = {
+  marinho: logoMarinho,
+  branco: logoBranco,
+}
 
 interface LogoProps {
-  variant?: 'wordmark' | 'monogram'
+  versao?: keyof typeof versoes
   className?: string
-  linkTo?: string
-  size?: 'sm' | 'md' | 'lg' | 'xl'
 }
 
-const sizes = {
-  sm: 'text-2xl',
-  md: 'text-4xl',
-  lg: 'text-6xl',
-  xl: 'text-8xl',
-}
-
-function LogoInner({ variant = 'wordmark', className, size = 'md' }: Omit<LogoProps, 'linkTo'>) {
-  if (variant === 'monogram') {
-    return (
-      <span
-        className={cn('font-display uppercase tracking-tight leading-none', sizes[size], className)}
-        style={{ fontFamily: 'Anton, sans-serif', letterSpacing: '-0.025em' }}
-      >
-        E<span style={{ color: 'var(--vermelho)' }}>·</span>Z
-      </span>
-    )
-  }
-
+export function LogoStatic({ versao = 'marinho', className }: LogoProps) {
   return (
-    <span
-      className={cn('font-display uppercase leading-none', sizes[size], className)}
-      style={{ fontFamily: 'Anton, sans-serif', letterSpacing: '-0.025em' }}
-    >
-      ESQUE<span style={{ color: 'var(--vermelho)' }}>N</span>TA.
-    </span>
+    <img
+      src={versoes[versao]}
+      alt="Spark"
+      width={200}
+      height={36}
+      className={cn('block h-auto w-[200px] select-none', className)}
+      draggable={false}
+    />
   )
 }
 
-export function Logo({ linkTo = '/', ...props }: LogoProps) {
+export function Logo({ linkTo = '/', ...props }: LogoProps & { linkTo?: string }) {
   return (
-    <Link to={linkTo} className="hover:opacity-90 transition-opacity">
-      <LogoInner {...props} />
+    <Link to={linkTo} className="shrink-0">
+      <LogoStatic {...props} />
     </Link>
   )
-}
-
-export function LogoStatic(props: Omit<LogoProps, 'linkTo'>) {
-  return <LogoInner {...props} />
 }

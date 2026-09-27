@@ -1,8 +1,8 @@
-# ESQUENTA
+# Spark
 
-E-commerce de jogos de festa e acessórios pra rolê adulto brasileiro (cartas autorais, kit beer pong, copos, dados). Projeto de TCC.
+E-commerce de jogos e acessórios pro pré: cartas, beer pong, copos e kits. Projeto de TCC. A marca se chamava ESQUENTA até set/2026; o manual da Spark fica em `../marca/`.
 
-**Stack:** Vite + React + TypeScript + Tailwind + shadcn/ui · Supabase (banco, auth, storage) · Mercado Pago (pagamento) · GitHub Pages (deploy).
+**Stack:** Vite + React + TypeScript + Tailwind · Supabase (banco, auth, storage) · Mercado Pago (pagamento) · GitHub Pages (deploy).
 
 ## Rodar localmente
 
@@ -12,7 +12,15 @@ npm run dev      # http://localhost:5173
 ```
 
 O site lê produtos do Supabase quando há credenciais reais no `.env`; senão cai
-no catálogo mock (`src/data/mockProducts.ts`).
+no catálogo mock (`src/data/mockProducts.ts`). Se o banco falhar uma vez (ex.:
+projeto pausado), o resto da sessão usa o mock direto.
+
+## Marca
+
+Tokens em `src/index.css` (cobalto, marinho, papel; Saira e Michroma), logo oficial
+em `src/assets/brand/` e componentes do manual em `src/components/brand/`.
+Imagens de produto em `public/produtos/`: mockups do pitch e embalagens
+renderizadas no padrão do manual. Todas ilustrativas.
 
 ## Deploy (GitHub Pages)
 

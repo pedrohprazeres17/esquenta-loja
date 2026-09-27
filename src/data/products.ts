@@ -4,37 +4,43 @@
  * Usa o Supabase quando há credenciais reais no .env (isSupabaseConfigured);
  * senão cai no mockProducts.ts — assim o site funciona em dev mesmo sem banco
  * e "liga a chave" automaticamente quando o Supabase é conectado.
+ *
+ * Se o banco falhar uma vez (ex.: projeto pausado), o resto da sessão usa o
+ * mock direto, sem esperar a rede de novo a cada página.
  */
 import { isSupabaseConfigured, productsApi } from '@/lib/supabase'
 import { mockProducts } from './mockProducts'
 import type { Product } from '@/types'
 
-export async function getAllProducts(): Promise<Product[]> {
-  if (!isSupabaseConfigured) return mockProducts
+let bancoFora = false
+
+async function fromDb<T>(load: () => Promise<T>, fallback: () => T, what: string): Promise<T> {
+  if (!isSupabaseConfigured || bancoFora) return fallback()
   try {
-    return await productsApi.getAll()
+    return await load()
   } catch (e) {
-    console.error('Falha ao carregar produtos do Supabase — usando mock:', e)
-    return mockProducts
+    bancoFora = true
+    console.error(`Falha ao carregar ${what} do Supabase — usando mock:`, e)
+    return fallback()
   }
 }
 
-export async function getFeaturedProducts(): Promise<Product[]> {
-  if (!isSupabaseConfigured) return mockProducts.filter(p => p.is_featured).slice(0, 4)
-  try {
-    return await productsApi.getFeatured()
-  } catch (e) {
-    console.error('Falha ao carregar destaques do Supabase — usando mock:', e)
-    return mockProducts.filter(p => p.is_featured).slice(0, 4)
-  }
+export function getAllProducts(): Promise<Product[]> {
+  return fromDb(() => productsApi.getAll(), () => mockProducts, 'produtos')
 }
 
-export async function getProductBySlug(slug: string): Promise<Product | null> {
-  if (!isSupabaseConfigured) return mockProducts.find(p => p.slug === slug) ?? null
-  try {
-    return await productsApi.getBySlug(slug)
-  } catch (e) {
-    console.error('Falha ao carregar produto do Supabase — usando mock:', e)
-    return mockProducts.find(p => p.slug === slug) ?? null
-  }
+export function getFeaturedProducts(): Promise<Product[]> {
+  return fromDb(
+    () => productsApi.getFeatured(),
+    () => mockProducts.filter(p => p.is_featured).slice(0, 4),
+    'destaques',
+  )
+}
+
+export function getProductBySlug(slug: string): Promise<Product | null> {
+  return fromDb(
+    () => productsApi.getBySlug(slug),
+    () => mockProducts.find(p => p.slug === slug) ?? null,
+    'produto',
+  )
 }

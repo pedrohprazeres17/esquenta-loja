@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -7,16 +7,18 @@ import { Trash2, Edit, Plus, Upload, X, Link as LinkIcon } from 'lucide-react'
 import { getAllProducts } from '@/data/products'
 import { authApi, isSupabaseConfigured, productsApi, productSupplyApi, supabase } from '@/lib/supabase'
 import type { Product, ProductSupply } from '@/types'
-import { formatPrice, slugify } from '@/lib/utils'
-import { FitaObra, Logo } from '@/components/brand'
+import { cn, formatPrice, slugify } from '@/lib/utils'
+import { CATEGORIES, categoryLabel } from '@/lib/categories'
+import { Logo } from '@/components/brand'
+import { Field } from '@/components/form/Field'
 
 const productSchema = z.object({
-  name: z.string().min(2, 'Nome obrigatorio'),
-  slug: z.string().min(2, 'Slug obrigatorio'),
+  name: z.string().min(2, 'Nome obrigatório'),
+  slug: z.string().min(2, 'Slug obrigatório'),
   category: z.enum(['cartas', 'beer-pong', 'copos', 'kits', 'acessorios']),
-  price_brl: z.string().min(1, 'Preco obrigatorio'),
+  price_brl: z.string().min(1, 'Preço obrigatório'),
   supplier_price_brl: z.string().optional(),
-  description: z.string().min(10, 'Descricao obrigatoria'),
+  description: z.string().min(10, 'Descrição obrigatória'),
   stock: z.number().min(0),
   is_featured: z.boolean(),
   is_limited: z.boolean(),
@@ -24,31 +26,10 @@ const productSchema = z.object({
   max_edition: z.coerce.number().optional(),
   supplier_id: z.string().optional(),
   supplier_sku: z.string().optional(),
-  supplier_url: z.string().url('URL invalida').optional().or(z.literal('')),
+  supplier_url: z.string().url('URL inválida').optional().or(z.literal('')),
 })
 
 type ProductForm = z.infer<typeof productSchema>
-
-const CATEGORIES = [
-  { value: 'cartas', label: 'Cartas' },
-  { value: 'beer-pong', label: 'Beer Pong' },
-  { value: 'copos', label: 'Copos' },
-  { value: 'kits', label: 'Kits' },
-  { value: 'acessorios', label: 'Acessorios' },
-]
-
-function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <label className="font-mono text-xs uppercase block mb-1" style={{ color: 'color-mix(in srgb, var(--papel) 60%, transparent)', letterSpacing: '0.1em' }}>
-      {children}
-    </label>
-  )
-}
-
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null
-  return <p className="font-mono text-xs mt-1" style={{ color: 'var(--vermelho)' }}>{message}</p>
-}
 
 export function Admin() {
   const navigate = useNavigate()
@@ -165,7 +146,7 @@ export function Admin() {
       is_limited: data.is_limited,
       edition_number: data.is_limited ? data.edition_number : undefined,
       max_edition: data.is_limited ? data.max_edition : undefined,
-      image_urls: imageUrls.length ? imageUrls : ['https://placehold.co/600x800/0E0D0B/FF2A1F?text=' + encodeURIComponent(data.name)],
+      image_urls: imageUrls.length ? imageUrls : ['https://placehold.co/800x800/0041D2/FEFEFE?text=' + encodeURIComponent(data.name)],
     }
     const supply = {
       supplier_id: data.supplier_id || undefined,
@@ -229,179 +210,142 @@ export function Admin() {
 
   if (authChecking) {
     return (
-      <div style={{ backgroundColor: 'var(--preto)', minHeight: '100vh' }} className="flex items-center justify-center">
-        <p className="font-mono" style={{ color: 'color-mix(in srgb, var(--papel) 60%, transparent)' }}>Verificando acesso…</p>
+      <div className="flex min-h-screen items-center justify-center bg-papel">
+        <p className="t-label text-concreto">Verificando acesso</p>
       </div>
     )
   }
 
   return (
-    <div style={{ backgroundColor: 'var(--preto)', minHeight: '100vh' }}>
-      {/* Admin header */}
-      <div className="border-b-2 px-6 py-4 flex items-center justify-between" style={{ borderColor: 'var(--vermelho)', backgroundColor: 'var(--preto)' }}>
-        <div className="flex items-center gap-4">
-          <Logo size="sm" />
-          <span className="font-mono text-xs uppercase px-2 py-1 border" style={{ borderColor: 'var(--vermelho)', color: 'var(--vermelho)' }}>
-            ADMIN
-          </span>
+    <div className="min-h-screen bg-papel">
+      <header className="bg-cobalto text-branco">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-5">
+            <Logo versao="branco" />
+            <span className="t-label border border-branco/60 px-2 py-1 text-[10px]">Admin</span>
+          </div>
+          <Link to="/" className="t-label text-branco/80 hover:text-branco">Ver loja</Link>
         </div>
-      </div>
+      </header>
 
-      <FitaObra height="6px" />
-
-      <div className="max-w-7xl mx-auto px-4 py-10">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-10">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-6">
           <div>
-            <h1 className="section-title text-5xl" style={{ fontFamily: 'Anton, sans-serif', color: 'var(--papel)' }}>
-              PRODUTOS
-            </h1>
-            <p className="font-mono text-sm mt-1" style={{ color: 'color-mix(in srgb, var(--papel) 50%, transparent)' }}>
-              {products.length} produto(s) cadastrado(s)
-            </p>
+            <p className="t-label text-cobalto">{products.length} {products.length === 1 ? 'produto' : 'produtos'}</p>
+            <h1 className="t-display mt-3 text-5xl text-marinho">Produtos.</h1>
             <span
-              className="inline-block font-mono text-xs uppercase px-2 py-1 mt-2"
-              style={{
-                letterSpacing: '0.1em',
-                color: isSupabaseConfigured ? 'var(--preto)' : 'var(--amarelo)',
-                backgroundColor: isSupabaseConfigured ? 'var(--amarelo)' : 'transparent',
-                border: isSupabaseConfigured ? 'none' : '1px solid var(--amarelo)',
-              }}
+              className={cn(
+                't-label mt-4 inline-block px-2 py-1 text-[10px]',
+                isSupabaseConfigured ? 'bg-cobalto text-branco' : 'border border-marinho text-marinho',
+              )}
             >
-              {isSupabaseConfigured ? '● BANCO CONECTADO — alterações salvam de verdade' : '○ MODO MOCK — conecte o Supabase pra persistir'}
+              {isSupabaseConfigured ? 'Banco conectado · alterações salvam de verdade' : 'Modo mock · conecte o Supabase pra salvar'}
             </span>
           </div>
-          <button onClick={openNew} className="btn btn-primary flex items-center gap-2">
-            <Plus size={16} /> NOVO PRODUTO
+          <button onClick={openNew} className="btn btn-primary">
+            <Plus size={16} /> Novo produto
           </button>
         </div>
 
-        {/* Form modal */}
+        {/* Formulário */}
         {showForm && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-10 px-4" style={{ backgroundColor: 'rgba(14,13,11,0.95)' }}>
-            <div className="w-full max-w-2xl border-2 p-8" style={{ backgroundColor: 'var(--preto)', borderColor: 'var(--papel)' }}>
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="section-title text-3xl" style={{ fontFamily: 'Anton, sans-serif', color: 'var(--papel)' }}>
-                  {editingId ? 'EDITAR PRODUTO' : 'NOVO PRODUTO'}
-                </h2>
-                <button onClick={() => setShowForm(false)} className="text-papel hover:text-vermelho transition-colors">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-marinho/60 px-4 py-10">
+            <div className="w-full max-w-2xl bg-branco p-6 sm:p-8">
+              <div className="mb-8 flex items-center justify-between">
+                <h2 className="t-display text-3xl text-marinho">{editingId ? 'Editar produto' : 'Novo produto'}</h2>
+                <button onClick={() => setShowForm(false)} className="text-marinho hover:text-cobalto" aria-label="Fechar">
                   <X size={24} />
                 </button>
               </div>
 
               <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <Label>NOME DO PRODUTO</Label>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="Nome do produto" error={errors.name?.message} className="sm:col-span-2">
                     <input
                       {...register('name')}
-                      placeholder="Ex: ESQUENTA CARTAS"
+                      placeholder="Ex: SPARK CARTAS"
                       onChange={e => {
                         setValue('name', e.target.value)
                         if (!editingId) setValue('slug', slugify(e.target.value))
                       }}
                     />
-                    <FieldError message={errors.name?.message} />
-                  </div>
+                  </Field>
 
-                  <div>
-                    <Label>SLUG (URL)</Label>
-                    <input {...register('slug')} placeholder="esquenta-cartas" />
-                    <FieldError message={errors.slug?.message} />
-                  </div>
+                  <Field label="Slug (URL)" error={errors.slug?.message}>
+                    <input {...register('slug')} placeholder="spark-cartas" />
+                  </Field>
 
-                  <div>
-                    <Label>CATEGORIA</Label>
-                    <select {...register('category')} style={{ backgroundColor: 'var(--preto)', color: 'var(--papel)' }}>
+                  <Field label="Categoria" error={errors.category?.message}>
+                    <select {...register('category')}>
                       {CATEGORIES.map(c => (
                         <option key={c.value} value={c.value}>{c.label}</option>
                       ))}
                     </select>
-                    <FieldError message={errors.category?.message} />
-                  </div>
+                  </Field>
 
-                  <div>
-                    <Label>PRECO (R$)</Label>
-                    <input {...register('price_brl')} placeholder="89,90" />
-                    <FieldError message={errors.price_brl?.message} />
-                  </div>
+                  <Field label="Preço (R$)" error={errors.price_brl?.message}>
+                    <input {...register('price_brl')} placeholder="89,90" inputMode="decimal" />
+                  </Field>
 
-                  <div>
-                    <Label>ESTOQUE</Label>
+                  <Field label="Estoque" error={errors.stock?.message}>
                     <input {...register('stock', { valueAsNumber: true })} type="number" min="0" placeholder="0" />
-                    <FieldError message={errors.stock?.message} />
-                  </div>
+                  </Field>
 
-                  <div className="sm:col-span-2">
-                    <Label>DESCRICAO</Label>
-                    <textarea {...register('description')} rows={4} placeholder="Descricao do produto..." style={{ resize: 'vertical' }} />
-                    <FieldError message={errors.description?.message} />
-                  </div>
+                  <Field label="Descrição" error={errors.description?.message} className="sm:col-span-2">
+                    <textarea {...register('description')} rows={4} placeholder="Curta e com o número que importa." className="resize-y" />
+                  </Field>
                 </div>
 
-                <FitaObra height="4px" />
-                <p className="font-mono text-xs uppercase" style={{ color: 'var(--amarelo)', letterSpacing: '0.1em' }}>DROPSHIPPING</p>
+                <h3 className="t-label border-t border-linha pt-5 text-marinho">Fornecedor · só admin</h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label>FORNECEDOR ID</Label>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="Fornecedor ID">
                     <input {...register('supplier_id')} placeholder="sup-001" />
-                  </div>
-                  <div>
-                    <Label>SKU FORNECEDOR</Label>
-                    <input {...register('supplier_sku')} placeholder="EQ-CARTAS-001" />
-                  </div>
-                  <div>
-                    <Label>CUSTO FORNECEDOR (R$)</Label>
-                    <input {...register('supplier_price_brl')} placeholder="35,00" />
-                  </div>
-                  <div>
-                    <Label>URL FORNECEDOR</Label>
+                  </Field>
+                  <Field label="SKU do fornecedor">
+                    <input {...register('supplier_sku')} placeholder="SP-CARTAS-001" />
+                  </Field>
+                  <Field label="Custo (R$)">
+                    <input {...register('supplier_price_brl')} placeholder="35,00" inputMode="decimal" />
+                  </Field>
+                  <Field label="URL do fornecedor" error={errors.supplier_url?.message}>
                     <input {...register('supplier_url')} placeholder="https://..." />
-                    <FieldError message={errors.supplier_url?.message} />
-                  </div>
+                  </Field>
                 </div>
 
-                <FitaObra height="4px" />
-
-                <div className="flex flex-wrap gap-6">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" {...register('is_featured')} className="w-4 h-4" style={{ accentColor: 'var(--vermelho)' }} />
-                    <span className="font-mono text-sm" style={{ color: 'var(--papel)' }}>FEATURED (home)</span>
+                <div className="flex flex-wrap gap-6 border-t border-linha pt-5">
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <input type="checkbox" {...register('is_featured')} className="h-4 w-4" />
+                    <span className="text-sm">Destaque na home</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" {...register('is_limited')} className="w-4 h-4" style={{ accentColor: 'var(--vermelho)' }} />
-                    <span className="font-mono text-sm" style={{ color: 'var(--papel)' }}>EDICAO LIMITADA</span>
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <input type="checkbox" {...register('is_limited')} className="h-4 w-4" />
+                    <span className="text-sm">Edição limitada (lote)</span>
                   </label>
                 </div>
 
                 {isLimited && (
-                  <div className="grid grid-cols-2 gap-4 p-4 border" style={{ borderColor: 'var(--amarelo)' }}>
-                    <div>
-                      <Label>N.º DA EDICAO</Label>
+                  <div className="grid grid-cols-2 gap-4 bg-papel p-4">
+                    <Field label="Nº do lote">
                       <input {...register('edition_number')} type="number" placeholder="1" />
-                    </div>
-                    <div>
-                      <Label>TOTAL DA EDICAO</Label>
+                    </Field>
+                    <Field label="Total da edição">
                       <input {...register('max_edition')} type="number" placeholder="500" />
-                    </div>
+                    </Field>
                   </div>
                 )}
 
-                {/* Image upload */}
+                {/* Imagens */}
                 <div>
-                  <Label>IMAGENS</Label>
+                  <span className="field-label">Imagens</span>
                   <div
-                    className="border-2 p-6 text-center cursor-pointer transition-colors"
-                    style={{ borderColor: 'color-mix(in srgb, var(--papel) 30%, transparent)', borderStyle: 'dashed' }}
+                    className="cursor-pointer border-2 border-dashed border-marinho/30 p-6 text-center transition-colors hover:border-cobalto"
                     onDrop={handleDrop}
                     onDragOver={e => e.preventDefault()}
                     onClick={() => document.getElementById('file-input')?.click()}
                   >
-                    <Upload size={24} className="mx-auto mb-2" style={{ color: 'color-mix(in srgb, var(--papel) 40%, transparent)' }} />
-                    <p className="font-mono text-sm" style={{ color: 'color-mix(in srgb, var(--papel) 50%, transparent)' }}>
-                      Arraste imagens ou clique pra selecionar
-                    </p>
+                    <Upload size={24} className="mx-auto mb-2 text-marinho/50" />
+                    <p className="text-sm text-concreto">Arraste as imagens ou clique pra escolher</p>
                     <input
                       id="file-input"
                       type="file"
@@ -417,31 +361,30 @@ export function Admin() {
                   </div>
 
                   {/* Colar URL — pra usar a foto hospedada do fornecedor (persiste no banco) */}
-                  <div className="flex gap-2 mt-3" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center gap-2 flex-1 border px-3" style={{ borderColor: 'color-mix(in srgb, var(--papel) 25%, transparent)' }}>
-                      <LinkIcon size={14} style={{ color: 'color-mix(in srgb, var(--papel) 40%, transparent)' }} />
+                  <div className="mt-3 flex gap-2" onClick={e => e.stopPropagation()}>
+                    <div className="flex flex-1 items-center gap-2 border border-preto/20 bg-branco pl-3">
+                      <LinkIcon size={14} className="shrink-0 text-concreto" />
                       <input
                         type="url"
                         value={imageUrlInput}
                         onChange={e => setImageUrlInput(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addImageUrl() } }}
-                        placeholder="Colar URL da foto (ex: do fornecedor)"
-                        className="flex-1 border-0 bg-transparent py-2 font-mono text-sm"
-                        style={{ color: 'var(--papel)' }}
+                        placeholder="Colar URL da foto"
+                        className="border-0 shadow-none focus:shadow-none"
                       />
                     </div>
-                    <button type="button" onClick={addImageUrl} className="btn btn-outline btn-sm">ADD</button>
+                    <button type="button" onClick={addImageUrl} className="btn btn-outline btn-sm">Adicionar</button>
                   </div>
                   {imageUrls.length > 0 && (
-                    <div className="flex gap-2 mt-3 flex-wrap">
+                    <div className="mt-3 flex flex-wrap gap-2">
                       {imageUrls.map((url, i) => (
-                        <div key={i} className="relative w-16 h-16 border" style={{ borderColor: 'var(--papel)' }}>
-                          <img src={url} alt="" className="w-full h-full object-cover" />
+                        <div key={i} className="relative h-16 w-16 border border-linha bg-branco">
+                          <img src={url} alt="" className="h-full w-full object-contain" />
                           <button
                             type="button"
-                            className="absolute top-0 right-0 w-5 h-5 flex items-center justify-center text-xs"
-                            style={{ backgroundColor: 'var(--vermelho)', color: 'var(--papel)' }}
+                            className="absolute right-0 top-0 flex h-5 w-5 items-center justify-center bg-marinho text-branco"
                             onClick={() => setImageUrls(prev => prev.filter((_, j) => j !== i))}
+                            aria-label="Remover imagem"
                           >
                             <X size={10} />
                           </button>
@@ -451,12 +394,12 @@ export function Admin() {
                   )}
                 </div>
 
-                <div className="flex gap-3 mt-2">
+                <div className="mt-2 flex gap-3">
                   <button type="button" onClick={() => setShowForm(false)} className="btn btn-outline">
-                    CANCELAR
+                    Cancelar
                   </button>
                   <button type="submit" className="btn btn-primary flex-1" disabled={isSubmitting}>
-                    {isSubmitting ? 'SALVANDO...' : editingId ? 'SALVAR ALTERACOES' : 'CRIAR PRODUTO'}
+                    {isSubmitting ? 'Salvando' : editingId ? 'Salvar alterações' : 'Criar produto'}
                   </button>
                 </div>
               </form>
@@ -464,73 +407,62 @@ export function Admin() {
           </div>
         )}
 
-        {/* Products table */}
-        <div className="border-2 overflow-hidden" style={{ borderColor: 'color-mix(in srgb, var(--papel) 20%, transparent)' }}>
-          <div
-            className="grid font-mono text-xs uppercase px-4 py-3 border-b-2"
-            style={{
-              gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto',
-              borderColor: 'color-mix(in srgb, var(--papel) 20%, transparent)',
-              backgroundColor: 'color-mix(in srgb, var(--papel) 5%, transparent)',
-              color: 'color-mix(in srgb, var(--papel) 50%, transparent)',
-              letterSpacing: '0.1em',
-            }}
-          >
-            <span>PRODUTO</span>
-            <span>CATEGORIA</span>
-            <span>PRECO</span>
-            <span>CUSTO</span>
-            <span>ESTOQUE</span>
-            <span>ACOES</span>
-          </div>
-
-          {products.map(product => (
+        {/* Tabela */}
+        <div className="overflow-x-auto bg-branco">
+          <div className="min-w-[760px]">
             <div
-              key={product.id}
-              className="grid items-center px-4 py-4 border-b transition-colors hover:bg-papel/5"
-              style={{
-                gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto',
-                borderColor: 'color-mix(in srgb, var(--papel) 10%, transparent)',
-              }}
+              className="t-label grid gap-4 border-b-2 border-marinho px-4 py-3 text-[10px] text-concreto"
+              style={{ gridTemplateColumns: '2.2fr 1fr 1fr 1fr 0.7fr auto' }}
             >
-              <div className="flex items-center gap-3">
-                <img src={product.image_urls[0]} alt="" className="w-10 h-10 object-cover border" style={{ borderColor: 'color-mix(in srgb, var(--papel) 20%, transparent)' }} />
-                <div>
-                  <p className="font-display text-sm" style={{ fontFamily: 'Anton, sans-serif', color: 'var(--papel)' }}>{product.name}</p>
-                  <p className="font-mono text-xs" style={{ color: 'color-mix(in srgb, var(--papel) 40%, transparent)' }}>{product.slug}</p>
-                  {product.supplier_sku && <p className="font-mono text-xs" style={{ color: 'var(--amarelo)', opacity: 0.7 }}>{product.supplier_sku}</p>}
+              <span>Produto</span>
+              <span>Categoria</span>
+              <span>Preço</span>
+              <span>Custo</span>
+              <span>Estoque</span>
+              <span className="w-[76px]">Ações</span>
+            </div>
+
+            {products.map(product => (
+              <div
+                key={product.id}
+                className="grid items-center gap-4 border-b border-linha px-4 py-3 transition-colors hover:bg-papel/50"
+                style={{ gridTemplateColumns: '2.2fr 1fr 1fr 1fr 0.7fr auto' }}
+              >
+                <div className="flex items-center gap-3">
+                  <img src={product.image_urls[0]} alt="" className="h-12 w-12 shrink-0 object-contain" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold uppercase leading-tight">{product.name}</p>
+                    <p className="t-num mt-1 truncate text-[10px] text-concreto">{product.slug}</p>
+                    {product.supplier_sku && <p className="t-num text-[10px] text-cobalto">{product.supplier_sku}</p>}
+                  </div>
+                </div>
+                <span className="t-label text-[10px] text-concreto">{categoryLabel(product.category)}</span>
+                <span className="t-num text-sm text-marinho">{formatPrice(product.price_cents)}</span>
+                <span className={cn('t-num text-sm', product.supplier_price_cents ? 'text-preto' : 'text-concreto/60')}>
+                  {product.supplier_price_cents ? formatPrice(product.supplier_price_cents) : '—'}
+                </span>
+                <span className={cn('t-num text-sm', product.stock <= 5 ? 'font-semibold text-cobalto' : 'text-preto')}>
+                  {product.stock}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => openEdit(product)}
+                    className="border border-linha p-2 text-marinho transition-colors hover:border-cobalto hover:text-cobalto"
+                    aria-label={`Editar ${product.name}`}
+                  >
+                    <Edit size={14} />
+                  </button>
+                  <button
+                    onClick={() => deleteProduct(product.id)}
+                    className="border border-linha p-2 text-marinho transition-colors hover:border-cobalto hover:text-cobalto"
+                    aria-label={`Deletar ${product.name}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
-              <span className="font-mono text-xs uppercase" style={{ color: 'color-mix(in srgb, var(--papel) 60%, transparent)' }}>
-                {product.category.replace('-', ' ')}
-              </span>
-              <span className="font-mono text-sm" style={{ color: 'var(--vermelho)' }}>
-                {formatPrice(product.price_cents)}
-              </span>
-              <span className="font-mono text-sm" style={{ color: product.supplier_price_cents ? 'var(--amarelo)' : 'color-mix(in srgb, var(--papel) 30%, transparent)' }}>
-                {product.supplier_price_cents ? formatPrice(product.supplier_price_cents) : '—'}
-              </span>
-              <span className="font-mono text-sm" style={{ color: product.stock <= 5 ? 'var(--vermelho)' : 'var(--papel)' }}>
-                {product.stock}
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => openEdit(product)}
-                  className="p-2 border transition-colors hover:border-vermelho hover:text-vermelho"
-                  style={{ borderColor: 'color-mix(in srgb, var(--papel) 20%, transparent)', color: 'var(--papel)' }}
-                >
-                  <Edit size={14} />
-                </button>
-                <button
-                  onClick={() => deleteProduct(product.id)}
-                  className="p-2 border transition-colors hover:border-vermelho hover:text-vermelho"
-                  style={{ borderColor: 'color-mix(in srgb, var(--papel) 20%, transparent)', color: 'var(--papel)' }}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>

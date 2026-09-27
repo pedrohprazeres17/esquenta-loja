@@ -1,207 +1,175 @@
-@import url('https://fonts.googleapis.com/css2?family=Anton&family=Big+Shoulders+Stencil+Display:wght@900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
-
 @import "tailwindcss";
 
-/* ── Brand tokens ─────────────────────────────────────────── */
-:root {
-  --preto:    #0E0D0B;
-  --vermelho: #FF2A1F;
-  --papel:    #E8E1D2;
-  --vinho:    #6F1009;
-  --amarelo:  #FFE800;
-
-  --font-display: 'Anton', sans-serif;
-  --font-stencil: 'Big Shoulders Stencil Display', sans-serif;
-  --font-mono:    'Space Mono', monospace;
-}
-
-/* ── Tailwind theme extension ─────────────────────────────── */
+/* ── Marca Spark (manual v2.0) ────────────────────────────────
+   Cobalto é a cor da marca: botão, destaque e topo.
+   Papel é o fundo padrão. Vermelho, fogo e degradê não entram. */
 @theme {
-  --color-preto:    #0E0D0B;
-  --color-vermelho: #FF2A1F;
-  --color-papel:    #E8E1D2;
-  --color-vinho:    #6F1009;
-  --color-amarelo:  #FFE800;
+  --color-cobalto:  #0041D2;
+  --color-marinho:  #012B6B;
+  --color-azul:     #5280DA;
+  --color-preto:    #0C0C0B;
+  --color-concreto: #5B5B5A;
+  --color-papel:    #E9E8E8;
+  --color-branco:   #FEFEFE;
+  --color-linha:    rgb(12 12 11 / 0.14);
 
-  --font-family-display: 'Anton', sans-serif;
-  --font-family-stencil: 'Big Shoulders Stencil Display', sans-serif;
-  --font-family-mono:    'Space Mono', monospace;
-
-  --radius: 0px;
-}
-
-/* ── Base ─────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; }
-
-html { scroll-behavior: smooth; }
-
-body {
-  background-color: var(--preto);
-  color: var(--papel);
-  font-family: var(--font-mono);
-  margin: 0;
-  -webkit-font-smoothing: antialiased;
+  /* Duas famílias: Saira (título e texto) e Michroma (rótulo, preço, prazo, lote). */
+  --font-sans:  'Saira', system-ui, sans-serif;
+  --font-label: 'Michroma', 'Saira', sans-serif;
 }
 
-#root {
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+/* ── Base (na camada base: as utilidades do Tailwind sobrescrevem) ── */
+@layer base {
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: var(--color-papel);
+    color: var(--color-preto);
+    font-family: var(--font-sans);
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  #root {
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  ::selection { background: var(--color-cobalto); color: var(--color-branco); }
+
+  :focus-visible {
+    outline: 2px solid var(--color-azul);
+    outline-offset: 2px;
+  }
+
+  input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  textarea,
+  select {
+    width: 100%;
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    color: var(--color-preto);
+    background-color: var(--color-branco);
+    border: 1px solid rgb(12 12 11 / 0.22);
+    border-radius: 0;
+    padding: 0.8rem 0.9rem;
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  input:not([type='checkbox']):not([type='radio']):focus,
+  textarea:focus,
+  select:focus {
+    border-color: var(--color-cobalto);
+    box-shadow: 0 0 0 1px var(--color-cobalto);
+  }
+  input::placeholder,
+  textarea::placeholder { color: rgb(91 91 90 / 0.7); }
+
+  input[type='checkbox'] { accent-color: var(--color-cobalto); }
 }
 
-/* ── Neobrutalist button base ─────────────────────────────── */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display);
-  font-size: 1rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  border: 2px solid var(--preto);
-  border-radius: 0;
-  box-shadow: 4px 4px 0 var(--preto);
-  cursor: pointer;
-  transition: box-shadow 80ms ease, transform 80ms ease;
-  text-decoration: none;
-  white-space: nowrap;
-  padding: 0.75rem 1.5rem;
-}
-.btn:hover {
-  box-shadow: none;
-  transform: translate(4px, 4px);
-}
-.btn:active {
-  box-shadow: none;
-  transform: translate(4px, 4px);
-}
+@layer components {
+  /* Título: Saira Expanded Black Italic, caixa alta. */
+  .t-display {
+    font-family: var(--font-sans);
+    font-weight: 900;
+    font-style: italic;
+    font-stretch: 125%;
+    text-transform: uppercase;
+    line-height: 0.95;
+    letter-spacing: -0.01em;
+  }
 
-.btn-primary {
-  background-color: var(--vermelho);
-  color: var(--papel);
-  border-color: var(--preto);
-}
-.btn-primary:hover {
-  background-color: var(--papel);
-  color: var(--preto);
-}
+  /* Rótulo técnico em Michroma. */
+  .t-label {
+    font-family: var(--font-label);
+    font-size: 0.6875rem;
+    line-height: 1.35;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
 
-.btn-secondary {
-  background-color: var(--papel);
-  color: var(--preto);
-  border-color: var(--preto);
-}
-.btn-secondary:hover {
-  background-color: var(--vermelho);
-  color: var(--papel);
-}
+  /* Preço, prazo, lote e medida. */
+  .t-num {
+    font-family: var(--font-label);
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+  }
 
-.btn-outline {
-  background-color: transparent;
-  color: var(--papel);
-  border-color: var(--papel);
-  box-shadow: 4px 4px 0 var(--papel);
-}
-.btn-outline:hover {
-  background-color: var(--papel);
-  color: var(--preto);
-}
+  /* ── Botões ─────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    font-family: var(--font-label);
+    font-size: 0.75rem;
+    line-height: 1;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: center;
+    text-wrap: balance;
+    padding: 1.05rem 1.6rem;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.btn-sm {
-  font-size: 0.75rem;
-  padding: 0.5rem 1rem;
-}
+  .btn-primary { background-color: var(--color-cobalto); color: var(--color-branco); }
+  .btn-primary:hover:not(:disabled) { background-color: var(--color-marinho); }
 
-.btn-lg {
-  font-size: 1.25rem;
-  padding: 1rem 2rem;
-}
+  .btn-outline { border-color: var(--color-marinho); color: var(--color-marinho); background: transparent; }
+  .btn-outline:hover:not(:disabled) { background-color: var(--color-marinho); color: var(--color-branco); }
 
-/* ── Card hover neobrutalist ──────────────────────────────── */
-.card-hover {
-  transition: transform 80ms ease, box-shadow 80ms ease;
-}
-.card-hover:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0 var(--vermelho);
-}
+  /* Sobre fundo cobalto. */
+  .btn-light { background-color: var(--color-branco); color: var(--color-cobalto); }
+  .btn-light:hover:not(:disabled) { background-color: var(--color-papel); }
+  .btn-outline-light { border-color: rgb(254 254 254 / 0.7); color: var(--color-branco); background: transparent; }
+  .btn-outline-light:hover:not(:disabled) { background-color: var(--color-branco); color: var(--color-cobalto); }
 
-/* ── Ticker animation ─────────────────────────────────────── */
-@keyframes ticker {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
-.ticker-track {
-  display: flex;
-  animation: ticker 22s linear infinite;
-  width: max-content;
-}
+  .btn-sm { font-size: 0.6875rem; padding: 0.8rem 1.1rem; }
+  .btn-lg { font-size: 0.8125rem; padding: 1.2rem 2rem; }
+  .btn-icon { padding: 0; width: 2.5rem; height: 2.5rem; }
 
-/* ── Grain texture overlay ────────────────────────────────── */
-.grain::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  opacity: 0.03;
-  mix-blend-mode: overlay;
-  pointer-events: none;
-  z-index: 0;
-}
+  /* ── Link de texto ──────────────────────────────────────── */
+  .link {
+    color: var(--color-cobalto);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  .link:hover { color: var(--color-marinho); }
 
-/* ── Diagonal stripe (fita de obra) ──────────────────────── */
-.fita-obra {
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--preto) 0px,
-    var(--preto) 20px,
-    var(--vermelho) 20px,
-    var(--vermelho) 40px
-  );
-}
-
-.fita-amarela {
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--preto) 0px,
-    var(--preto) 20px,
-    var(--amarelo) 20px,
-    var(--amarelo) 40px
-  );
-}
-
-/* ── Section heading ──────────────────────────────────────── */
-.section-title {
-  font-family: var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: -0.025em;
-  line-height: 0.95;
-}
-
-/* ── Form inputs ──────────────────────────────────────────── */
-input, textarea, select {
-  font-family: var(--font-mono);
-  border-radius: 0 !important;
-  outline: none;
-  background: transparent;
-  border: 2px solid var(--papel);
-  color: var(--papel);
-  padding: 0.5rem 0.75rem;
-  width: 100%;
-}
-
-input:focus, textarea:focus, select:focus {
-  border-color: var(--vermelho);
-  box-shadow: 2px 2px 0 var(--vermelho);
-}
-
-input::placeholder, textarea::placeholder {
-  color: color-mix(in srgb, var(--papel) 40%, transparent);
-  font-family: var(--font-mono);
+  /* ── Formulário ─────────────────────────────────────────── */
+  .field-label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-family: var(--font-label);
+    font-size: 0.625rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-concreto);
+  }
+  .field-error {
+    margin-top: 0.4rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-marinho);
+  }
 }
 
 /* ── Scrollbar ────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--preto); }
-::-webkit-scrollbar-thumb { background: var(--vermelho); }
-::-webkit-scrollbar-thumb:hover { background: var(--vinho); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--color-papel); }
+::-webkit-scrollbar-thumb { background: rgb(1 43 107 / 0.35); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-marinho); }
+
+/* Barra de rolagem escondida (filtros em linha no celular). */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}

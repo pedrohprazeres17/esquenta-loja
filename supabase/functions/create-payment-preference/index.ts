@@ -53,7 +53,7 @@ serve(async (req) => {
         installments: 12,
       },
       notification_url: webhookUrl,
-      statement_descriptor: 'ESQUENTA',
+      statement_descriptor: 'SPARK',
       expires: false,
     }
 

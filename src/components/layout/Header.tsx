@@ -1,108 +1,90 @@
 import { useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
-import { ShoppingCart, Menu, X, User } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { ShoppingBag, Menu, X, User } from 'lucide-react'
 import { Logo } from '@/components/brand'
 import { useCart } from '@/contexts/CartContext'
+import { cn } from '@/lib/utils'
+
+const navLinks = [
+  { to: '/loja', label: 'Loja' },
+  { to: '/loja?categoria=kits', label: 'Kits' },
+  { to: '/sobre', label: 'Sobre' },
+]
 
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { itemCount } = useCart()
+  const location = useLocation()
 
-  const navLinks = [
-    { to: '/loja', label: 'LOJA' },
-    { to: '/manifesto', label: 'MANIFESTO' },
-  ]
-
-  const navClass = ({ isActive }: { isActive: boolean }) =>
-    `font-mono text-sm uppercase tracking-wider hover:text-vermelho transition-colors ${isActive ? 'text-vermelho' : 'text-papel'}`
+  // "Kits" é a loja filtrada; o NavLink não olha a query, então o ativo é calculado aqui.
+  const isActive = (to: string) => {
+    const [path, query] = to.split('?')
+    if (location.pathname !== path) return false
+    const atual = new URLSearchParams(location.search).get('categoria')
+    const alvo = new URLSearchParams(query).get('categoria')
+    return alvo ? atual === alvo : atual !== 'kits'
+  }
 
   return (
-    <header
-      className="sticky top-0 z-50 border-b-2"
-      style={{
-        backgroundColor: 'var(--preto)',
-        borderColor: 'var(--vermelho)',
-      }}
-    >
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Logo */}
-        <Logo size="sm" />
+    <header className="sticky top-0 z-50 bg-cobalto text-branco">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-4 sm:px-6">
+        <Logo versao="branco" />
 
-        {/* Nav desktop */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden items-center gap-9 md:flex" aria-label="Principal">
           {navLinks.map(({ to, label }) => (
-            <NavLink key={to} to={to} className={navClass}>
+            <Link
+              key={to}
+              to={to}
+              aria-current={isActive(to) ? 'page' : undefined}
+              className={cn(
+                't-label border-b-2 py-1 transition-colors',
+                isActive(to) ? 'border-branco text-branco' : 'border-transparent text-branco/75 hover:text-branco',
+              )}
+            >
               {label}
-            </NavLink>
+            </Link>
           ))}
         </nav>
 
-        {/* Actions */}
-        <div className="flex items-center gap-3">
-          <Link
-            to="/conta"
-            className="hidden md:flex items-center gap-1 text-papel hover:text-vermelho transition-colors"
-            aria-label="Minha conta"
-          >
+        <div className="flex items-center gap-5">
+          <Link to="/conta" className="hidden text-branco/80 transition-colors hover:text-branco md:block" aria-label="Minha conta">
             <User size={20} strokeWidth={1.5} />
           </Link>
 
           <Link
             to="/carrinho"
-            className="relative flex items-center gap-1 text-papel hover:text-vermelho transition-colors"
-            aria-label="Carrinho"
+            className="t-label flex items-center gap-2 text-branco transition-opacity hover:opacity-80"
+            aria-label={`Carrinho, ${itemCount} ${itemCount === 1 ? 'item' : 'itens'}`}
           >
-            <ShoppingCart size={20} strokeWidth={1.5} />
-            {itemCount > 0 && (
-              <span
-                className="absolute -top-2 -right-2 flex items-center justify-center w-5 h-5 text-xs"
-                style={{
-                  backgroundColor: 'var(--vermelho)',
-                  color: 'var(--papel)',
-                  fontFamily: 'Anton, sans-serif',
-                  fontSize: '11px',
-                }}
-              >
-                {itemCount > 9 ? '9+' : itemCount}
-              </span>
-            )}
+            <ShoppingBag size={19} strokeWidth={1.5} className="md:hidden" />
+            <span className="hidden md:inline">Carrinho</span>
+            <span className="t-num">({itemCount})</span>
           </Link>
 
-          {/* Mobile menu toggle */}
           <button
-            className="md:hidden text-papel hover:text-vermelho transition-colors"
+            className="text-branco md:hidden"
             onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Menu"
+            aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
+            aria-expanded={menuOpen}
           >
-            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+            {menuOpen ? <X size={22} strokeWidth={1.5} /> : <Menu size={22} strokeWidth={1.5} />}
           </button>
         </div>
       </div>
 
-      {/* Mobile nav */}
       {menuOpen && (
-        <div
-          className="md:hidden border-t-2 px-4 py-6 flex flex-col gap-6"
-          style={{ backgroundColor: 'var(--preto)', borderColor: 'var(--vermelho)' }}
-        >
-          {navLinks.map(({ to, label }) => (
-            <NavLink
+        <nav className="flex flex-col border-t border-branco/20 px-4 pb-6 pt-2 md:hidden" aria-label="Menu">
+          {[...navLinks, { to: '/conta', label: 'Minha conta' }].map(({ to, label }) => (
+            <Link
               key={to}
               to={to}
-              className={navClass}
+              className="t-label border-b border-branco/15 py-4 text-branco"
               onClick={() => setMenuOpen(false)}
             >
               {label}
-            </NavLink>
+            </Link>
           ))}
-          <Link
-            to="/conta"
-            className="font-mono text-sm uppercase tracking-wider text-papel hover:text-vermelho transition-colors"
-            onClick={() => setMenuOpen(false)}
-          >
-            MINHA CONTA
-          </Link>
-        </div>
+        </nav>
       )}
     </header>
   )

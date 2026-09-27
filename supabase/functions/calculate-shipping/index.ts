@@ -1,4 +1,4 @@
-// ESQUENTA · Cálculo de frete
+// Spark · Cálculo de frete
 //
 // Recebe { to_cep, items: [{ product_id, quantity }] }, busca peso/dimensões
 // dos produtos no banco (service role) e devolve as opções de frete.
@@ -7,7 +7,7 @@
 // DUAS FONTES, nesta ordem:
 //   1. Melhor Envio — se os secrets MELHOR_ENVIO_TOKEN + MELHOR_ENVIO_FROM_CEP
 //      estiverem setados (frete real de transportadoras).
-//   2. Tabela ESQUENTA — motor próprio por região do CEP + peso (origem SP).
+//   2. Tabela própria — motor próprio por região do CEP + peso (origem SP).
 //      Não depende de nada externo: já funciona sem configurar nada.
 //
 // Secrets (opcionais, só pro Melhor Envio):
@@ -86,8 +86,8 @@ function zoneOptions(cep: string, totalKg: number) {
   const eco = z.base_cents + (billableKg - 1) * z.per_kg_cents
   const exp = Math.round((eco * 1.7) / 10) * 10
   return [
-    { id: 1, name: 'Padrão', company: 'ESQUENTA Entregas', price_cents: eco, delivery_days: z.days },
-    { id: 2, name: 'Expressa', company: 'ESQUENTA Entregas', price_cents: exp, delivery_days: Math.max(1, Math.round(z.days * 0.5)) },
+    { id: 1, name: 'Padrão', company: 'Spark Entregas', price_cents: eco, delivery_days: z.days },
+    { id: 2, name: 'Expressa', company: 'Spark Entregas', price_cents: exp, delivery_days: Math.max(1, Math.round(z.days * 0.5)) },
   ]
 }
 
@@ -119,7 +119,7 @@ serve(async (req) => {
 
     // ── Fonte 2 (padrão): motor próprio, sem dependência externa ──
     if (!ME_TOKEN || ME_FROM_CEP.length !== 8) {
-      return json({ configured: true, source: 'esquenta', options: zoneOptions(toCep, totalKg) })
+      return json({ configured: true, source: 'spark', options: zoneOptions(toCep, totalKg) })
     }
 
     // ── Fonte 1: Melhor Envio (quando configurado) ──
@@ -142,7 +142,7 @@ serve(async (req) => {
         Accept: 'application/json',
         'Content-Type': 'application/json',
         Authorization: `Bearer ${ME_TOKEN}`,
-        'User-Agent': 'ESQUENTA (pedrohprazeres01@gmail.com)',
+        'User-Agent': 'Spark (pedrohprazeres01@gmail.com)',
       },
       body: JSON.stringify({
         from: { postal_code: ME_FROM_CEP },
@@ -154,7 +154,7 @@ serve(async (req) => {
 
     if (!meRes.ok) {
       // Se o Melhor Envio falhar, não trava o checkout: cai no motor próprio.
-      return json({ configured: true, source: 'esquenta_fallback', options: zoneOptions(toCep, totalKg) })
+      return json({ configured: true, source: 'spark_fallback', options: zoneOptions(toCep, totalKg) })
     }
 
     const raw = await meRes.json()
@@ -171,7 +171,7 @@ serve(async (req) => {
 
     // Melhor Envio sem nenhuma opção válida → motor próprio.
     if (options.length === 0) {
-      return json({ configured: true, source: 'esquenta_fallback', options: zoneOptions(toCep, totalKg) })
+      return json({ configured: true, source: 'spark_fallback', options: zoneOptions(toCep, totalKg) })
     }
 
     return json({ configured: true, source: 'melhor_envio', options })
