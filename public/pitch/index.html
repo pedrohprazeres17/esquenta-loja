@@ -25,7 +25,10 @@ body.hide-cursor{cursor:none}
 #stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden}
 
 .scene{position:absolute;inset:0;overflow:hidden;visibility:hidden}
-.scene.show{visibility:visible}
+.scene.show{visibility:visible;will-change:transform}
+/* Pré-aquecimento: desenha cada cena uma vez, escondida atrás da atual, já no estado final */
+.scene.warm{visibility:visible;z-index:0!important;will-change:transform}
+.warm .a,.warm .mask>span{animation:none!important;opacity:1!important;transform:none!important}
 .t-cobalto{background:var(--cobalto);color:var(--branco)}
 .t-papel{background:var(--papel);color:var(--marinho)}
 .t-marinho{background:var(--marinho);color:var(--branco)}
@@ -115,17 +118,11 @@ body.chrome-off #counter{opacity:0}
 #table{position:absolute;inset:0;z-index:1;background:radial-gradient(ellipse at 50% 45%,#0a3a8c 0%,#012B6B 45%,#00132f 100%);opacity:0;pointer-events:none}
 #stage.flipping{perspective:2600px}
 #stage.flipping .scene{backface-visibility:hidden;-webkit-backface-visibility:hidden;will-change:transform}
-#wave{position:absolute;left:0;top:0;width:3840px;height:70px;opacity:0;will-change:transform}
-#wave svg{width:100%;height:100%;display:block}
-#bubbles{position:absolute;inset:0}
-#bubbles i{position:absolute;border-radius:50%;border:3px solid rgba(254,254,254,.8);background:rgba(254,254,254,.18)}
 #hub{position:absolute;left:0;top:0;opacity:0}
 #hub .disc{position:absolute;left:-70px;top:-70px;width:140px;height:140px;border-radius:50%;background:var(--marinho);border:8px solid var(--branco);box-shadow:0 20px 40px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center}
 #hub .disc svg{width:64px;height:64px;fill:var(--branco)}
 #hand{position:absolute;left:0;top:-7px;width:2300px;height:14px;background:var(--branco);transform-origin:0 50%;border-radius:7px;box-shadow:0 0 30px rgba(254,254,254,.6)}
 #flash{position:absolute;left:0;top:0;width:300px;height:300px;margin:-150px 0 0 -150px;fill:var(--branco);opacity:0}
-#edges{position:absolute;inset:0}
-#edges i{position:absolute;top:0;width:6px;margin-left:-3px;background:var(--branco);box-shadow:0 0 18px rgba(0,0,0,.25)}
 
 /* ================= CENAS ================= */
 
@@ -188,7 +185,7 @@ body.chrome-off #counter{opacity:0}
 .bars .b{display:flex;align-items:center;gap:14px;margin-top:12px;font-family:'Michroma';font-size:12px;letter-spacing:.08em}
 .bars .b span:first-child{width:170px;opacity:.85}
 .bars .track{flex:1;height:22px;background:rgba(254,254,254,.18)}
-.bars .fill{height:100%;background:var(--branco);width:0;transition:width 1.4s var(--ease-out)}
+.bars .fill{height:100%;background:var(--branco);width:100%;transform:scaleX(0);transform-origin:left center;transition:transform 1.4s var(--ease-out)}
 .bars .val{width:74px;text-align:right}
 .house{position:absolute;right:40px;bottom:36px;width:130px;height:110px;stroke:var(--cobalto);fill:none;stroke-width:7;stroke-linejoin:round}
 .house path{stroke-dasharray:600;stroke-dashoffset:600}
@@ -378,8 +375,8 @@ body.chrome-off #counter{opacity:0}
     <div class="big">+<span data-count data-from="0" data-to="16" data-delay="1250" data-dur="1400">0</span>%</div>
     <p>em jogos de tabuleiro e cartas em 2025, contra +1,86% do setor de brinquedos.</p>
     <div class="bars">
-      <div class="b"><span>Jogos e cartas</span><div class="track"><div class="fill" data-w="100%"></div></div><span class="val">+16%</span></div>
-      <div class="b"><span>Brinquedos</span><div class="track"><div class="fill" data-w="11.6%"></div></div><span class="val">+1,86%</span></div>
+      <div class="b"><span>Jogos e cartas</span><div class="track"><div class="fill" data-w="1"></div></div><span class="val">+16%</span></div>
+      <div class="b"><span>Brinquedos</span><div class="track"><div class="fill" data-w=".116"></div></div><span class="val">+1,86%</span></div>
     </div>
   </div>
   <div class="card c-branco k3 a" style="--d:920">
@@ -516,11 +513,8 @@ body.chrome-off #counter{opacity:0}
 
 <div id="table"></div>
 <div id="fx"><div id="shadow"></div><div id="ring"></div><div id="ball"><svg><use href="#star"/></svg></div>
-  <div id="wave"><svg viewBox="0 0 2400 70" preserveAspectRatio="none"><path d="M0 40 C150 0 300 0 450 40 S750 80 900 40 S1200 0 1350 40 S1650 80 1800 40 S2100 0 2250 40 L2400 40 V70 H0Z"/></svg></div>
-  <div id="bubbles"></div>
   <div id="hub"><div id="hand"></div><div class="disc"><svg><use href="#star"/></svg></div></div>
   <svg id="flash"><use href="#star"/></svg>
-  <div id="edges"></div>
 </div>
 <div id="counter"><span class="dots"></span><span class="pos">01 / 14</span></div>
 </div>
@@ -581,6 +575,7 @@ body.chrome-off #counter{opacity:0}
     requestAnimationFrame(step);
   });
   const wait = ms => new Promise(r => setTimeout(r, ms));
+  const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
   // Trajetória em parábola entre dois pontos, com altura do pico
   const arc = (a, b, peak, t) => {
@@ -614,7 +609,7 @@ body.chrome-off #counter{opacity:0}
 
   function resetScene(s) {
     s.classList.remove('on');
-    s.querySelectorAll('.fill').forEach(f => f.style.width = '0');
+    s.querySelectorAll('.fill').forEach(f => f.style.transform = 'scaleX(0)');
     s.querySelectorAll('.grid20 i').forEach(i => i.classList.remove('off'));
     s.querySelectorAll('[data-count]').forEach(c => c.textContent = fmt(+c.dataset.from, c.dataset.dec));
     s.querySelectorAll('.tab').forEach(t => t.classList.remove('jitter'));
@@ -627,7 +622,7 @@ body.chrome-off #counter{opacity:0}
       const a = +c.dataset.from, b = +c.dataset.to, dur = +c.dataset.dur || 1400;
       setTimeout(() => tween(dur, e => c.textContent = fmt(a + (b - a) * e, c.dataset.dec), ease.out), +c.dataset.delay || 0);
     });
-    s.querySelectorAll('.fill').forEach((f, i) => setTimeout(() => f.style.width = f.dataset.w, 1300 + i * 200));
+    s.querySelectorAll('.fill').forEach((f, i) => setTimeout(() => f.style.transform = `scaleX(${f.dataset.w})`, 1300 + i * 200));
     s.querySelectorAll('.grid20').forEach(g => {
       const cells = [...g.children].slice(10).reverse();
       cells.forEach((c, i) => setTimeout(() => c.classList.add('off'), 1200 + i * 150));
@@ -708,9 +703,8 @@ body.chrome-off #counter{opacity:0}
 
   // ===== Repertório de transições =====
   const table = document.getElementById('table');
-  const wave = document.getElementById('wave'), bubbles = document.getElementById('bubbles');
   const hub = document.getElementById('hub'), hand = document.getElementById('hand');
-  const flash = document.getElementById('flash'), edges = document.getElementById('edges');
+  const flash = document.getElementById('flash');
   const setMask = (el, img, size = '', posi = '') => {
     for (const k of ['mask', 'webkitMask']) {
       el.style[k + 'Image'] = img; el.style[k + 'Size'] = size; el.style[k + 'Position'] = posi;
@@ -728,163 +722,176 @@ body.chrome-off #counter{opacity:0}
   const colorOf = next => bg[themeOf(next)];
   const inkOf = next => ['#E9E8E8', '#FEFEFE'].includes(colorOf(next)) ? '#012B6B' : '#FEFEFE';
 
+  // Tudo aqui só mexe em transform e opacity: a placa de vídeo anima sem redesenhar a cena.
+  const fxBox = document.getElementById('fx');
+  const EIO = 'cubic-bezier(.65,0,.35,1)', EOUT = 'cubic-bezier(.16,1,.3,1)', EIN = 'cubic-bezier(.55,0,1,.45)';
+  const mk = (css, parent = fxBox, tag = 'div') => {
+    const e = document.createElement(tag);
+    e.style.cssText = 'position:absolute;left:0;top:0;will-change:transform;' + css;
+    parent.append(e); return e;
+  };
+  const play = (el, kf, opt) => el.animate(kf, Object.assign({ fill: 'forwards' }, opt)).finished;
+  const covers = [];
+  const cover = (css, parent) => { const e = mk(css, parent); if (!parent) covers.push(e); return e; };
+  // A forma já cobriu a tela com a cor da cena nova: troca por baixo e tira a forma
+  async function reveal(next) {
+    next.classList.add('show');
+    await frame();
+    covers.splice(0).forEach(e => e.remove());
+    next.classList.add('on');
+  }
+
   const TR = {
-    // Bolinha de beer pong: arremesso, quique e a cena abre de onde ela caiu
+    // Bolinha de beer pong: arremesso, quique e a cor nova se abre de onde ela caiu
     async ball(next) {
-      const [bx, by] = pt(next);
-      next.style.clipPath = `circle(0px at ${bx}px ${by}px)`;
+      const [bx, by] = pt(next), col = colorOf(next);
       await throwBall([bx, by]);
       ring.style.borderColor = inkOf(next);
       ring.animate([
         { transform: `translate(${bx}px, ${by}px) scale(1)`, opacity: .9 },
         { transform: `translate(${bx}px, ${by}px) scale(22)`, opacity: 0 }
-      ], { duration: 700, easing: 'cubic-bezier(.16,1,.3,1)' });
-      const maxR = Math.hypot(Math.max(bx, W - bx), Math.max(by, H - by)) + 40;
-      onAt(next, 120);
-      await tween(720, (e, t) => {
-        next.style.clipPath = `circle(${36 + (maxR - 36) * e}px at ${bx}px ${by}px)`;
-        placeBall(bx, by, 1 + t * 1.4, 1 + t * 1.4);
-        ball.style.opacity = Math.max(0, 1 - t * 2.2);
-        shadow.style.opacity = Math.max(0, .4 - t);
-      }, ease.inOut);
-      ball.style.opacity = 0; shadow.style.opacity = 0;
+      ], { duration: 700, easing: EOUT });
+      const maxR = Math.hypot(Math.max(bx, W - bx), Math.max(by, H - by)) + 20;
+      const c = cover(`width:1200px;height:1200px;margin:-600px 0 0 -600px;border-radius:50%;background:${col}`);
+      ball.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: 'forwards' });
+      shadow.style.opacity = 0;
+      await play(c, [
+        { transform: `translate(${bx}px, ${by}px) scale(.06)` },
+        { transform: `translate(${bx}px, ${by}px) scale(${maxR / 600})` }
+      ], { duration: 680, easing: EIO });
+      ball.getAnimations().forEach(a => a.cancel()); ball.style.opacity = 0;
+      await reveal(next);
     },
 
     // Carta virando: a cena encolhe até virar uma carta, gira e o verso é a próxima
     async flip(next, prev) {
-      const dirn = (flipLeft = !flipLeft) ? 1 : -1;
+      const dirn = (flipLeft = !flipLeft) ? 1 : -1, sc = .74;
+      next.classList.add('show');
       stage.classList.add('flipping');
       table.style.opacity = 1;
-      const card = (el, sc, ang, r) => {
-        el.style.transform = `scale(${sc}) rotateY(${ang}deg)`;
-        el.style.borderRadius = r + 'px';
-        el.style.boxShadow = `0 ${50 * (1 - sc) * 4}px 120px rgba(0,0,0,${(1 - sc) * 2})`;
-      };
-      card(next, .74, 180 * dirn, 44);
-      await tween(380, e => card(prev, 1 - .26 * e, 0, 44 * e), ease.inOut);
-      let on = false;
-      await tween(760, (e, t) => {
-        const sc = .74 - .07 * Math.sin(Math.PI * t), a = 180 * e * -dirn;
-        card(prev, sc, a, 44); card(next, sc, a + 180 * dirn, 44);
-        if (!on && t > .55) { on = true; next.classList.add('on'); }
-      }, ease.inOut);
-      await tween(420, e => card(next, .74 + .26 * e, 0, 44 * (1 - e)), ease.inOut);
+      next.style.transform = `scale(${sc}) rotateY(${180 * dirn}deg)`;
+      await play(prev, [{ transform: 'scale(1) rotateY(0deg)' }, { transform: `scale(${sc}) rotateY(0deg)` }], { duration: 360, easing: EIO });
+      const mid = { easing: EIO, duration: 760 };
+      await Promise.all([
+        play(prev, [{ transform: `scale(${sc}) rotateY(0deg)` }, { transform: `scale(${sc - .06}) rotateY(${-90 * dirn}deg)`, offset: .5 }, { transform: `scale(${sc}) rotateY(${-180 * dirn}deg)` }], mid),
+        play(next, [{ transform: `scale(${sc}) rotateY(${180 * dirn}deg)` }, { transform: `scale(${sc - .06}) rotateY(${90 * dirn}deg)`, offset: .5 }, { transform: `scale(${sc}) rotateY(0deg)` }], mid),
+      ]);
+      next.classList.add('on');
+      await play(next, [{ transform: `scale(${sc}) rotateY(0deg)` }, { transform: 'scale(1) rotateY(0deg)' }], { duration: 420, easing: EIO });
+      for (const el of [prev, next]) { el.getAnimations().forEach(a => a.cancel()); el.style.transform = ''; }
       table.style.opacity = 0;
       stage.classList.remove('flipping');
     },
 
     // Copo enchendo: a cor nova sobe com onda e bolhas
     async pour(next) {
-      const fill = colorOf(next);
-      wave.querySelector('path').setAttribute('fill', fill);
-      wave.style.opacity = 1;
-      bubbles.innerHTML = '';
-      const bs = [...Array(18)].map(() => {
-        const b = document.createElement('i'), d = 10 + Math.random() * 26;
-        b.style.cssText = `width:${d}px;height:${d}px;left:${Math.random() * W}px;top:${H + 40}px`;
-        bubbles.append(b);
-        return { b, sp: .6 + Math.random() * .8, dl: Math.random() * .4, dx: (Math.random() - .5) * 60 };
-      });
-      onAt(next, 700);
-      await tween(1350, (e, t) => {
-        const top = H * (1 - e);
-        next.style.clipPath = `inset(${top}px 0 0 0)`;
-        const amp = 1 - Math.pow(t, 3);
-        wave.style.transform = `translate(${-((t * 2600) % 1920)}px, ${top - 66}px) scaleY(${.4 + amp})`;
-        bs.forEach(o => {
-          const k = Math.max(0, (t - o.dl) / (1 - o.dl));
-          const y = H + 40 - k * o.sp * 1500;
-          o.b.style.transform = `translate(${Math.sin(k * 8) * 10 + o.dx * k}px, ${y - H - 40}px)`;
-          o.b.style.opacity = y > top ? 1 - k * .3 : 0;
-        });
-      }, ease.inOut);
-      wave.style.opacity = 0; bubbles.innerHTML = '';
+      const col = colorOf(next);
+      const box = cover(`width:${W}px;height:${H + 90}px`);
+      const w = mk(`width:3840px;height:90px`, box, 'div');
+      w.innerHTML = `<svg viewBox="0 0 2400 70" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><path fill="${col}" d="M0 40 C150 0 300 0 450 40 S750 80 900 40 S1200 0 1350 40 S1650 80 1800 40 S2100 0 2250 40 L2400 40 V70 H0Z"/></svg>`;
+      mk(`top:88px;width:${W}px;height:${H + 10}px;background:${col}`, box);
+      w.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-1920px)' }], { duration: 1500, iterations: Infinity });
+      for (let k = 0; k < 16; k++) {
+        const d = 12 + Math.random() * 24, x = Math.random() * W;
+        const b = mk(`width:${d}px;height:${d}px;border-radius:50%;border:3px solid rgba(254,254,254,.85);background:rgba(254,254,254,.18)`, box);
+        b.animate([{ transform: `translate(${x}px, ${H + 60}px)` }, { transform: `translate(${x + (Math.random() - .5) * 80}px, ${120 + Math.random() * 300}px)`, opacity: 0 }],
+          { duration: 1100 + Math.random() * 500, delay: Math.random() * 300, easing: 'ease-out', fill: 'forwards' });
+      }
+      await play(box, [{ transform: `translateY(${H}px)` }, { transform: 'translateY(-90px)' }], { duration: 1350, easing: EIO });
+      await reveal(next);
     },
 
-    // Card crescendo: um cartão da cena atual cresce e vira a próxima cena
+    // Card crescendo: um cartão da cena atual cresce, troca de cor e vira a próxima cena
     async grow(next, prev, sel) {
       const src = prev.querySelector(sel);
       const r = src ? rectOf(src) : { x: 860, y: 440, w: 200, h: 200 };
-      if (src) src.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)', boxShadow: '0 40px 80px rgba(0,0,0,.35)' }], { duration: 260, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'forwards' });
-      await wait(240);
-      const ins = e => `inset(${r.y * (1 - e)}px ${(W - r.x - r.w) * (1 - e)}px ${(H - r.y - r.h) * (1 - e)}px ${r.x * (1 - e)}px round ${24 * (1 - e)}px)`;
-      next.style.clipPath = ins(0);
-      onAt(next, 520);
-      await tween(900, e => next.style.clipPath = ins(e), t => t < .5 ? 8 * t ** 4 : 1 - Math.pow(-2 * t + 2, 4) / 2);
-      if (src) src.getAnimations().forEach(a => a.cancel());
+      if (src) await play(src, [{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }], { duration: 240, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+      const c = cover(`width:${r.w}px;height:${r.h}px;background:${colorOf(next)};transform-origin:0 0`);
+      await play(c, [
+        { transform: `translate(${r.x - r.w * .03}px, ${r.y - r.h * .03}px) scale(1.06)`, opacity: .0 },
+        { transform: `translate(${r.x - r.w * .03}px, ${r.y - r.h * .03}px) scale(1.06)`, opacity: 1, offset: .12 },
+        { transform: `translate(0px, 0px) scale(${W / r.w}, ${H / r.h})`, opacity: 1 }
+      ], { duration: 900, easing: 'cubic-bezier(.76,0,.24,1)' });
+      if (src) src.getAnimations().filter(a => !a.animationName).forEach(a => a.cancel());
+      await reveal(next);
     },
 
-    // Faísca: a estrela da marca explode e abre a cena
+    // Faísca: a estrela da marca explode e abre a cor nova
     async spark(next) {
-      const [cx, cy] = pt(next);
-      const starSvg = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1000 1000'%3E%3Cpath d='M220 500L463.2 463.2L500 30L536.8 463.2L780 500L536.8 536.8L500 970L463.2 536.8Z'/%3E%3C/svg%3E")`;
+      const [cx, cy] = pt(next), col = colorOf(next);
       flash.style.fill = inkOf(next) === '#FEFEFE' ? '#FEFEFE' : '#0041D2';
       flash.animate([
         { transform: `translate(${cx}px, ${cy}px) scale(0) rotate(0deg)`, opacity: 1 },
         { transform: `translate(${cx}px, ${cy}px) scale(1.3) rotate(45deg)`, opacity: 1, offset: .55 },
         { transform: `translate(${cx}px, ${cy}px) scale(.2) rotate(90deg)`, opacity: 0 }
-      ], { duration: 650, easing: 'cubic-bezier(.16,1,.3,1)' });
+      ], { duration: 650, easing: EOUT });
       for (let k = 0; k < 10; k++) {
         const a = Math.random() * Math.PI * 2, d = 300 + Math.random() * 500, sz = .15 + Math.random() * .25;
-        const s2 = flash.cloneNode(true); s2.id = ''; document.getElementById('fx').append(s2);
+        const s2 = flash.cloneNode(true); s2.removeAttribute('id'); s2.style.cssText = 'position:absolute;left:0;top:0;width:300px;height:300px;margin:-150px 0 0 -150px;will-change:transform;fill:' + flash.style.fill;
+        fxBox.append(s2);
         s2.animate([
           { transform: `translate(${cx}px, ${cy}px) scale(0)`, opacity: 1 },
           { transform: `translate(${cx + Math.cos(a) * d}px, ${cy + Math.sin(a) * d}px) scale(${sz}) rotate(90deg)`, opacity: 0 }
-        ], { duration: 900 + Math.random() * 400, delay: 150, easing: 'cubic-bezier(.16,1,.3,1)' }).onfinish = () => s2.remove();
+        ], { duration: 900 + Math.random() * 400, delay: 150, easing: EOUT }).onfinish = () => s2.remove();
       }
-      await wait(300);
+      await wait(260);
       const maxR = Math.hypot(Math.max(cx, W - cx), Math.max(cy, H - cy)) + 20;
-      onAt(next, 420);
-      await tween(1000, (e, t) => {
-        const S = 6200 * e;
-        const R = Math.max(0, (t - .3) / .7) ** 2 * maxR;
-        setMask(next, `${starSvg}, radial-gradient(circle at ${cx}px ${cy}px, #000 ${R}px, transparent ${R + 1}px)`,
-          `${S}px ${S}px, 100% 100%`, `${cx - S / 2}px ${cy - S / 2}px, 0 0`);
-      }, ease.in);
+      const st = cover(`width:1000px;height:1000px;margin:-500px 0 0 -500px`);
+      st.innerHTML = `<svg viewBox="0 0 1000 1000" style="width:100%;height:100%;display:block;fill:${col}"><use href="#star"/></svg>`;
+      const c = cover(`width:1200px;height:1200px;margin:-600px 0 0 -600px;border-radius:50%;background:${col}`);
+      await Promise.all([
+        play(st, [{ transform: `translate(${cx}px, ${cy}px) scale(0) rotate(0deg)` }, { transform: `translate(${cx}px, ${cy}px) scale(6) rotate(20deg)` }], { duration: 950, easing: EIN }),
+        play(c, [{ transform: `translate(${cx}px, ${cy}px) scale(0)` }, { transform: `translate(${cx}px, ${cy}px) scale(0)`, offset: .3 }, { transform: `translate(${cx}px, ${cy}px) scale(${maxR / 600})` }], { duration: 950, easing: EIN }),
+      ]);
+      await reveal(next);
     },
 
-    // Roleta: um ponteiro gira e varre a cena nova
+    // Roleta: um ponteiro gira e a cor nova preenche a volta inteira
     async roleta(next) {
-      const [cx, cy] = pt(next);
-      hub.style.transform = `translate(${cx}px, ${cy}px)`;
+      const cx = 960, cy = 540, R = 1110, col = colorOf(next);
       hand.style.background = inkOf(next) === '#FEFEFE' ? '#FEFEFE' : '#0041D2';
-      hub.animate([{ opacity: 0, transform: `translate(${cx}px, ${cy}px) scale(.3)` }, { opacity: 1, transform: `translate(${cx}px, ${cy}px) scale(1)` }], { duration: 280, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'forwards' });
-      hand.style.transform = 'rotate(-90deg)';
-      await wait(260);
-      onAt(next, 520);
-      await tween(1150, e => {
-        const a = 360 * e;
-        hand.style.transform = `rotate(${a - 90}deg)`;
-        setMask(next, `conic-gradient(from 0deg at ${cx}px ${cy}px, #000 ${a}deg, transparent ${a + .3}deg)`);
-      }, ease.inOut);
+      const pie = cover(`transform:translate(${cx}px, ${cy}px)`);
+      const wa = mk(`left:0;top:${-R}px;width:${R}px;height:${2 * R}px;overflow:hidden;will-change:auto`, pie);
+      const d1 = mk(`left:${-R}px;top:0;width:${R}px;height:${2 * R}px;border-radius:${R}px 0 0 ${R}px;background:${col};transform-origin:100% 50%`, wa);
+      const wb = mk(`left:${-R}px;top:${-R}px;width:${R}px;height:${2 * R}px;overflow:hidden;will-change:auto`, pie);
+      const d2 = mk(`left:${R}px;top:0;width:${R}px;height:${2 * R}px;border-radius:0 ${R}px ${R}px 0;background:${col};transform-origin:0 50%`, wb);
+      fxBox.append(hub);
+      hub.style.transform = `translate(${cx}px, ${cy}px)`;
+      hub.animate([{ opacity: 0, transform: `translate(${cx}px, ${cy}px) scale(.3)` }, { opacity: 1, transform: `translate(${cx}px, ${cy}px) scale(1)` }], { duration: 260, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'forwards' });
+      await wait(240);
+      const half = 560;
+      await Promise.all([
+        play(hand, [{ transform: 'rotate(-90deg)', easing: EIN }, { transform: 'rotate(90deg)', easing: 'cubic-bezier(0,.55,.45,1)' }, { transform: 'rotate(270deg)' }], { duration: half * 2 }),
+        play(d1, [{ transform: 'rotate(0deg)' }, { transform: 'rotate(180deg)' }], { duration: half, easing: EIN }),
+        play(d2, [{ transform: 'rotate(0deg)' }, { transform: 'rotate(180deg)' }], { duration: half, delay: half, easing: 'cubic-bezier(0,.55,.45,1)' }),
+      ]);
+      await reveal(next);
       hub.getAnimations().forEach(a => a.cancel());
-      await hub.animate([{ opacity: 1, transform: `translate(${cx}px, ${cy}px) scale(1)` }, { opacity: 0, transform: `translate(${cx}px, ${cy}px) scale(1.6)` }], { duration: 260, easing: 'ease-in' }).finished;
+      await play(hub, [{ opacity: 1, transform: `translate(${cx}px, ${cy}px) scale(1)` }, { opacity: 0, transform: `translate(${cx}px, ${cy}px) scale(1.6)` }], { duration: 260, easing: 'ease-in' });
+      hub.getAnimations().forEach(a => a.cancel()); hand.getAnimations().forEach(a => a.cancel());
       hub.style.opacity = 0;
     },
 
-    // Baralho: a cena nova cai em faixas, como cartas sendo distribuídas
+    // Baralho: a cor nova cai em faixas, como cartas sendo distribuídas
     async deal(next) {
-      const n = 8, w = W / n, order = [3, 0, 6, 2, 7, 4, 1, 5];
-      edges.innerHTML = '';
-      const lines = [...Array(n - 1)].map((_, k) => { const l = document.createElement('i'); l.style.left = (k + 1) * w + 'px'; l.style.height = '0px'; edges.append(l); return l; });
-      const dur = 560, gap = 80, total = dur + gap * (n - 1);
-      onAt(next, total * .55);
-      await tween(total, (e, t) => {
-        const ms = t * total;
-        const hs = order.map((o, k) => { const p = Math.min(1, Math.max(0, (ms - k * gap) / dur)); return (1 - Math.pow(1 - p, 3)) * H; });
-        const h = [...Array(n)].map((_, k) => hs[order.indexOf(k)]);
-        const pts = ['0px 0px'];
-        for (let k = 0; k < n; k++) pts.push(`${k * w}px 0px`, `${k * w}px ${h[k]}px`, `${(k + 1) * w}px ${h[k]}px`, `${(k + 1) * w}px 0px`);
-        next.style.clipPath = `polygon(${pts.join(',')})`;
-        lines.forEach((l, k) => { l.style.height = Math.max(h[k], h[k + 1]) + 'px'; l.style.opacity = 1 - t * t; });
-      }, t => t);
-      edges.innerHTML = '';
+      const n = 8, w = W / n, order = [3, 0, 6, 2, 7, 4, 1, 5], col = colorOf(next), line = inkOf(next);
+      const strips = order.map((k, pos) => {
+        const st = cover(`left:${k * w}px;width:${w + 1}px;height:${H}px;background:${col};box-shadow:0 18px 30px rgba(0,0,0,.25)`);
+        mk(`left:0;top:0;width:4px;height:${H}px;background:${line};opacity:.9;will-change:auto`, st);
+        return play(st, [{ transform: `translateY(${-H - 60}px) rotate(${(pos % 2 ? 1 : -1) * 2}deg)` }, { transform: 'translateY(0) rotate(0deg)' }],
+          { duration: 560, delay: pos * 80, easing: EOUT });
+      });
+      await Promise.all(strips);
+      await reveal(next);
     },
 
     async fade(next) {
+      next.classList.add('show');
       next.style.opacity = 0;
       next.classList.add('on');
-      await tween(reduce ? 250 : 420, e => next.style.opacity = e, ease.out);
+      await play(next, [{ opacity: 0 }, { opacity: 1 }], { duration: reduce ? 250 : 380, easing: EOUT });
+      next.getAnimations().filter(a => !a.animationName).forEach(a => a.cancel());
+      next.style.opacity = '';
     },
   };
   let flipLeft = false;
@@ -892,11 +899,11 @@ body.chrome-off #counter{opacity:0}
   async function run(i, dir) {
     const next = scenes[i], prev = cur >= 0 ? scenes[cur] : null;
     resetScene(next);
-    next.style.zIndex = 3; next.classList.add('show');
+    next.style.zIndex = 3;
     if (prev) prev.style.zIndex = 2;
 
     if (!prev) {
-      next.classList.add('on');
+      next.classList.add('show', 'on');
       if (i === 0) capaIntro();
     } else if (dir > 0 && !reduce) {
       const [kind, arg] = (next.dataset.tr || 'ball').split(':');
@@ -952,7 +959,19 @@ body.chrome-off #counter{opacity:0}
   let start = NaN;
   try { start = parseInt(location.hash.slice(1), 10); } catch (e) {}
   if (!(start >= 1 && start <= N)) start = 1;
-  document.fonts.ready.then(() => go(start - 1, 1));
+  // Decodifica todas as imagens antes de começar e depois pré-desenha as outras cenas
+  const decodeAll = () => Promise.all([...document.images].map(im => (im.decode ? im.decode() : Promise.resolve()).catch(() => {})));
+  async function warmUp() {
+    for (const sc of scenes) {
+      if (sc.classList.contains('show')) continue;
+      while (busy) await wait(200);
+      sc.classList.add('warm');
+      await frame();
+      sc.classList.remove('warm');
+      await wait(60);
+    }
+  }
+  Promise.all([document.fonts.ready, decodeAll()]).then(() => go(start - 1, 1)).then(() => wait(2600)).then(warmUp);
   window.__spark = { go, get cur() { return cur; }, get busy() { return busy; } };
 })();
 </script>
